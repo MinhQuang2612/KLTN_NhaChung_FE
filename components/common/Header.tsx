@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import AreaDropdown from "./AreaDropdown";
+import { usePathname } from "next/navigation";
+import AreaDropdown from "../home/AreaDropdown";
 
 export default function Header() {
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState("trang-chu"); // Track current page
+  const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto detect current page based on pathname
+  const getCurrentPage = () => {
+    if (pathname === "/") return "trang-chu";
+    if (pathname === "/find_share" || pathname.startsWith("/room_details")) return "tim-phong";
+    if (pathname === "/post") return "o-ghep";
+    if (pathname === "/blog") return "dang-tin";
+    if (pathname === "/support") return "ho-tro";
+    return "trang-chu";
+  };
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -23,11 +34,11 @@ export default function Header() {
   }, []);
 
   const menuItems = [
-    { id: "trang-chu", label: "Trang chủ", href: "#" },
-    { id: "tim-phong", label: "Tìm phòng", href: "#" },
-    { id: "o-ghep", label: "Ở ghép", href: "#" },
-    { id: "dang-tin", label: "Đăng tin", href: "#" },
-    { id: "ho-tro", label: "Hỗ trợ", href: "#" },
+    { id: "trang-chu", label: "Trang chủ", href: "/" },
+    { id: "tim-phong", label: "Tìm phòng/Ở ghép", href: "/find_share" },
+    { id: "o-ghep", label: "Đăng tin", href: "/post" },
+    { id: "dang-tin", label: "Blog", href: "/blog" },
+    { id: "ho-tro", label: "Hỗ trợ", href: "/support" },
   ];
 
   return (
@@ -35,14 +46,14 @@ export default function Header() {
       <div className="w-full px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Logo and Location */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-lg">N</span>
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Nhà Chung
             </span>
-          </div>
+          </a>
           
           <div className="relative" ref={dropdownRef}>
             <button 
@@ -71,16 +82,15 @@ export default function Header() {
             <a 
               key={item.id}
               className={`transition-all duration-300 font-medium relative group ${
-                currentPage === item.id 
+                getCurrentPage() === item.id 
                   ? 'text-white font-bold' 
                   : 'text-white/90 hover:text-white'
               }`} 
               href={item.href}
-              onClick={() => setCurrentPage(item.id)}
             >
               {item.label}
               <span className={`absolute -bottom-1 left-0 h-0.5 bg-teal-400 transition-all duration-300 ${
-                currentPage === item.id ? 'w-full' : 'w-0 group-hover:w-full'
+                getCurrentPage() === item.id ? 'w-full' : 'w-0 group-hover:w-full'
               }`}></span>
             </a>
           ))}

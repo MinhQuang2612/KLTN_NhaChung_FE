@@ -35,12 +35,12 @@ const areas = [
               className="flex gap-6 overflow-x-hidden scroll-smooth pb-4"
             >
               {areas.map((a, index) => (
-                <div key={index} className="flex-shrink-0 w-80 relative overflow-hidden rounded-2xl shadow-lg">
-                  <img src={a.img} alt={a.name} className="h-48 w-full object-cover"/>
-                  <div className="absolute inset-0 bg-black/35" />
+                <div key={index} className="flex-shrink-0 w-80 relative overflow-hidden rounded-2xl shadow-lg group cursor-pointer hover:shadow-2xl hover:scale-105 transition-all duration-300">
+                  <img src={a.img} alt={a.name} className="h-48 w-full object-cover group-hover:scale-110 transition-transform duration-500"/>
+                  <div className="absolute inset-0 bg-black/35 group-hover:bg-black/25 transition-colors duration-300" />
                   <div className="absolute inset-0 p-4 flex flex-col justify-between text-white">
-                    <div className="text-lg font-semibold">{a.name}</div>
-                    <div className="text-sm opacity-90">{a.stat}</div>
+                    <div className="text-lg font-semibold group-hover:text-xl transition-all duration-300">{a.name}</div>
+                    <div className="text-sm opacity-90 group-hover:opacity-100 group-hover:text-base transition-all duration-300">{a.stat}</div>
                   </div>
                 </div>
               ))}
@@ -49,9 +49,9 @@ const areas = [
             {/* Chevron Left Button */}
             <button 
               onClick={() => scrollContainer('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-white border border-slate-200 rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow z-10"
+              className="absolute left-0 top-1/2 -translate-y-1/2 bg-white border border-slate-200 rounded-full p-2 shadow-lg hover:shadow-xl hover:scale-110 hover:bg-gray-50 transition-all duration-300 z-10"
             >
-              <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-slate-600 hover:text-teal-600 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
@@ -59,9 +59,9 @@ const areas = [
             {/* Chevron Right Button */}
             <button 
               onClick={() => scrollContainer('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 bg-white border border-slate-200 rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow z-10"
+              className="absolute right-0 top-1/2 -translate-y-1/2 bg-white border border-slate-200 rounded-full p-2 shadow-lg hover:shadow-xl hover:scale-110 hover:bg-gray-50 transition-all duration-300 z-10"
             >
-              <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-slate-600 hover:text-teal-600 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>

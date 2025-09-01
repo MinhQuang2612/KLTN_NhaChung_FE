@@ -128,32 +128,39 @@ export default function HeroSection() {
             })}
           </div>
 
-          {/* Recent searches */}
-          {recentSearches.length > 0 && (
-            <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                <span className="font-medium">Đã tìm gần đây:</span>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {recentSearches.map((r, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleRecentClick(r)}
-                    className="px-2 py-1 bg-gray-100 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-200 hover:text-gray-800 transition-colors cursor-pointer"
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-              <button 
-                onClick={clearFilters} 
-                className="ml-auto text-teal-600 hover:text-teal-700 font-medium hover:underline transition-colors"
-              >
-                Xóa lọc
-              </button>
-            </div>
-          )}
+                     {/* Recent searches and clear filters */}
+           <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
+             {recentSearches.length > 0 ? (
+               <>
+                 <div className="flex items-center gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                   <span className="font-medium">Đã tìm gần đây:</span>
+                 </div>
+                 <div className="flex gap-2 flex-wrap">
+                   {recentSearches.map((r, index) => (
+                     <button
+                       key={index}
+                       onClick={() => handleRecentClick(r)}
+                       className="px-2 py-1 bg-gray-100 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-200 hover:text-gray-800 transition-colors cursor-pointer"
+                     >
+                       {r}
+                     </button>
+                   ))}
+                 </div>
+               </>
+             ) : (
+               <div className="flex items-center gap-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                 <span className="font-medium text-gray-500">Chưa có tìm kiếm gần đây</span>
+               </div>
+             )}
+             <button 
+               onClick={clearFilters} 
+               className="ml-auto text-teal-600 hover:text-teal-700 font-medium hover:underline transition-colors"
+             >
+               Xóa lọc
+             </button>
+           </div>
         </div>
       </div>
     </section>
