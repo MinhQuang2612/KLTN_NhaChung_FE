@@ -11,7 +11,7 @@ const items = [
     title: "An tâm, uy tín",
     desc:
       "Tất cả thông tin chủ nhà và phòng đều được xác thực rõ ràng. Bạn thuê phòng với sự yên tâm tuyệt đối từ quy trình kiểm duyệt của Nhà Chung.",
-    icon: "/home/icon-brand.png",
+    icon: "/home/logo.webp",
   },
   {
     number: "3",
