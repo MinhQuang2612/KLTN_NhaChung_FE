@@ -1,7 +1,7 @@
-# 🏠 KLTN_TRUST-STAY  
+# 🏠 KLTN_NhaChung_FE 
 **Nền tảng tìm phòng trọ thông minh kết hợp AI**
 
-TrustStay là một dự án tốt nghiệp hướng đến việc xây dựng nền tảng tìm kiếm, đánh giá và gợi ý phòng trọ thông minh dành cho sinh viên và người đi làm. Dự án ứng dụng trí tuệ nhân tạo (AI) để tìm kiếm (text2sql), phân tích đánh giá, xếp hạng uy tín người cho thuê, và đưa ra gợi ý nơi ở phù hợp nhất theo nhu cầu cá nhân.
+Nhà Chung là một dự án tốt nghiệp hướng đến việc xây dựng nền tảng tìm kiếm, đánh giá và gợi ý phòng trọ thông minh dành cho sinh viên và người đi làm. Dự án ứng dụng trí tuệ nhân tạo (AI) để tìm kiếm (text2sql), phân tích đánh giá, xếp hạng uy tín người cho thuê, và đưa ra gợi ý nơi ở phù hợp nhất theo nhu cầu cá nhân.
 
 ---
 
