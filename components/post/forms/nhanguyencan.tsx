@@ -1,26 +1,28 @@
 "use client";
 import { useMemo, useState } from "react";
+import type { Address, NhaNguyenCanData } from "../PostForm";
 
-type Address = {
-  city: string;
-  district: string;
-  ward: string;
-  street: string;
-  houseNumber: string;
-  showHouseNumber: boolean;
-};
+const FEATURES = [
+  "Hẻm xe hơi",
+  "Nhà nở hậu",
+  "Nhà tóp hậu",
+  "Nhà dính quy hoạch / lộ giới",
+  "Nhà chưa hoàn công",
+  "Nhà nát",
+  "Đất chưa chuyển thổ",
+  "Hiện trạng khác",
+] as const;
 
+/* Modal địa chỉ (giữ nguyên) */
 function AddressModal({
-  open,
-  onClose,
-  onSave,
-  initial,
+  ...props
 }: {
   open: boolean;
   onClose: () => void;
   onSave: (a: Address | null) => void;
   initial?: Partial<Address>;
 }) {
+  const { open, onClose, onSave, initial } = props;
   const [f, setF] = useState<Address>({
     city: initial?.city || "",
     district: initial?.district || "",
@@ -31,14 +33,12 @@ function AddressModal({
   });
   const set = (k: keyof Address, v: any) => setF((s) => ({ ...s, [k]: v }));
   if (!open) return null;
-
   const handleSave = () => {
-    const allEmpty =
+    const empty =
       !f.city && !f.district && !f.ward && !f.street && !f.houseNumber;
-    onSave(allEmpty ? null : f);
+    onSave(empty ? null : f);
     onClose();
   };
-
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
@@ -79,7 +79,7 @@ function AddressModal({
             </label>
             <button
               onClick={handleSave}
-              className="w-full h-11 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600"
+              className="w-full h-11 rounded-xl bg-teal-500 text-white"
             >
               XONG
             </button>
@@ -90,113 +90,81 @@ function AddressModal({
   );
 }
 
-const FEATURES = [
-  "Hẻm xe hơi",
-  "Nhà nở hậu",
-  "Nhà tóp hậu",
-  "Nhà dính quy hoạch / lộ giới",
-  "Nhà chưa hoàn công",
-  "Nhà nát",
-  "Đất chưa chuyển thổ",
-  "Hiện trạng khác",
-] as const;
-
-export default function NhaNguyenCanForm() {
-  // Địa chỉ + khu/lô + mã căn
+export default function NhaNguyenCanForm({
+  data,
+  setData,
+}: {
+  data: NhaNguyenCanData;
+  setData: (next: NhaNguyenCanData) => void;
+}) {
   const [addrOpen, setAddrOpen] = useState(false);
-  const [addr, setAddr] = useState<Address | null>(null);
-  const [khuLo, setKhuLo] = useState(""); // Tên khu / lô
-  const [unitCode, setUnitCode] = useState(""); // Mã căn
-
-  // Thông tin chi tiết
-  const [loaiHinh, setLoaiHinh] = useState(""); // 1 cột
-  const [soPhongNgu, setSoPhongNgu] = useState("");
-  const [soVeSinh, setSoVeSinh] = useState("");
-  const [huong, setHuong] = useState("");
-  const [tongSoTang, setTongSoTang] = useState("");
-
-  // Thông tin khác
-  const [noiThat, setNoiThat] = useState("");
-  const [tinhTrangSo, setTinhTrangSo] = useState("");
-  const [featureSet, setFeatureSet] = useState<Set<string>>(new Set());
-
-  // Diện tích & giá
-  const [dtDat, setDtDat] = useState(""); // m² (đất)
-  const [dtSuDung, setDtSuDung] = useState(""); // m² (sử dụng)
-  const [ngang, setNgang] = useState(""); // m
-  const [dai, setDai] = useState(""); // m
-  const [price, setPrice] = useState("");
-  const [deposit, setDeposit] = useState("");
   const [err, setErr] = useState<{ dtDat?: string; price?: string }>({});
-  const onBlurReq = (k: "dtDat" | "price", v: string, m: string) =>
-    setErr((s) => ({ ...s, [k]: v.trim() ? undefined : m }));
 
-  // Tiêu đề & mô tả
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const titleCount = useMemo(() => `${title.length}/70 kí tự`, [title]);
-  const descCount = useMemo(() => `${desc.length}/1500 kí tự`, [desc]);
+  const patch =
+    <K extends keyof NhaNguyenCanData>(k: K) =>
+    (v: NhaNguyenCanData[K]) =>
+      setData({ ...data, [k]: v });
 
-  const addrText = addr
+  const titleCount = useMemo(
+    () => `${data.title.length}/70 kí tự`,
+    [data.title]
+  );
+  const descCount = useMemo(
+    () => `${data.desc.length}/1500 kí tự`,
+    [data.desc]
+  );
+
+  const addrText = data.addr
     ? [
-        addr.showHouseNumber && addr.houseNumber ? addr.houseNumber : "",
-        addr.street,
-        addr.ward,
-        addr.district,
-        addr.city,
+        data.addr.showHouseNumber && data.addr.houseNumber
+          ? data.addr.houseNumber
+          : "",
+        data.addr.street,
+        data.addr.ward,
+        data.addr.district,
+        data.addr.city,
       ]
         .filter(Boolean)
         .join(", ")
     : "";
 
-  const toggleFeature = (f: string) =>
-    setFeatureSet((s) => {
-      const n = new Set(s);
-      n.has(f) ? n.delete(f) : n.add(f);
-      return n;
-    });
+  const onBlurReq = (k: "dtDat" | "price", v: string, m: string) =>
+    setErr((s) => ({ ...s, [k]: v.trim() ? undefined : m }));
+
+  const toggleFeature = (f: string) => {
+    const cur = data.featureSet ?? [];
+    const next = cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f];
+    patch("featureSet")(next);
+  };
 
   return (
     <div className="space-y-6">
-      {/* === ĐỊA CHỈ === */}
+      {/* ĐỊA CHỈ */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Địa chỉ</h3>
 
-        {/* Tên khu / lô & Mã căn (cùng hàng) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-          <div className="relative">
-            <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={khuLo}
-              onChange={(e) => setKhuLo(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                              peer-focus:top-[2px] peer-focus:text-xs
-                              peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Tên khu / lô
-            </label>
-          </div>
-          <div className="relative">
-            <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={unitCode}
-              onChange={(e) => setUnitCode(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                              peer-focus:top-[2px] peer-focus:text-xs
-                              peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Mã căn
-            </label>
-          </div>
+          {[
+            ["khuLo", "Tên khu / lô"],
+            ["unitCode", "Mã căn"],
+          ].map(([k, label]) => (
+            <div className="relative" key={k}>
+              <input
+                className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                placeholder=" "
+                value={(data as any)[k]}
+                onChange={(e) => patch(k as any)(e.target.value)}
+              />
+              <label
+                className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
+                                peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+              >
+                {label}
+              </label>
+            </div>
+          ))}
         </div>
 
-        {/* Nút chọn địa chỉ */}
         <button
           type="button"
           onClick={() => setAddrOpen(true)}
@@ -204,7 +172,7 @@ export default function NhaNguyenCanForm() {
         >
           <span className={addrText ? "text-gray-900" : "text-gray-400"}>
             {addrText ? (
-              <> {addrText} </>
+              addrText
             ) : (
               <>
                 Địa chỉ <span className="text-red-500">*</span>
@@ -215,18 +183,18 @@ export default function NhaNguyenCanForm() {
         </button>
       </div>
 
-      {/* === THÔNG TIN CHI TIẾT === */}
+      {/* THÔNG TIN CHI TIẾT */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Thông tin chi tiết</h3>
 
         {/* Loại hình: 1 cột */}
         <div className="relative mb-3">
           <select
-            className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px]
-                        focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
-                        ${loaiHinh === "" ? "text-gray-400" : "text-gray-900"}`}
-            value={loaiHinh}
-            onChange={(e) => setLoaiHinh(e.target.value)}
+            className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none ${
+              data.loaiHinh === "" ? "text-gray-400" : "text-gray-900"
+            }`}
+            value={data.loaiHinh}
+            onChange={(e) => patch("loaiHinh")(e.target.value)}
           >
             <option value="" disabled hidden>
               Loại hình
@@ -243,110 +211,80 @@ export default function NhaNguyenCanForm() {
 
         {/* Còn lại: 2 cột */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Số phòng ngủ */}
-          <div className="relative">
-            <input
-              type="number"
-              min={0}
-              step={1}
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={soPhongNgu}
-              onChange={(e) => setSoPhongNgu(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                              peer-focus:top-[2px] peer-focus:text-xs
-                              peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Số phòng ngủ
-            </label>
-          </div>
-
-          {/* Số phòng vệ sinh */}
-          <div className="relative">
-            <input
-              type="number"
-              min={0}
-              step={1}
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={soVeSinh}
-              onChange={(e) => setSoVeSinh(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                              peer-focus:top-[2px] peer-focus:text-xs
-                              peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Số phòng vệ sinh
-            </label>
-          </div>
-
-          {/* Hướng */}
-          <div className="relative">
-            <select
-              className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px]
-                          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
-                          ${huong === "" ? "text-gray-400" : "text-gray-900"}`}
-              value={huong}
-              onChange={(e) => setHuong(e.target.value)}
-            >
-              <option value="" disabled hidden>
-                Hướng
-              </option>
-              <option value="dong">Đông</option>
-              <option value="tay">Tây</option>
-              <option value="nam">Nam</option>
-              <option value="bac">Bắc</option>
-              <option value="dong-nam">Đông Nam</option>
-              <option value="dong-bac">Đông Bắc</option>
-              <option value="tay-nam">Tây Nam</option>
-              <option value="tay-bac">Tây Bắc</option>
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
-              ▾
-            </span>
-          </div>
-
-          {/* Tổng số tầng */}
-          <div className="relative">
-            <input
-              type="number"
-              min={0}
-              step={1}
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={tongSoTang}
-              onChange={(e) => setTongSoTang(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                              peer-focus:top-[2px] peer-focus:text-xs
-                              peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Tổng số tầng
-            </label>
-          </div>
+          {[
+            ["soPhongNgu", "Số phòng ngủ"],
+            ["soVeSinh", "Số phòng vệ sinh"],
+            ["huong", "Hướng"],
+            ["tongSoTang", "Tổng số tầng"],
+          ].map(([k, label]) => (
+            <div className="relative" key={k}>
+              {k === "huong" ? (
+                <>
+                  <select
+                    className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none ${
+                      data.huong === "" ? "text-gray-400" : "text-gray-900"
+                    }`}
+                    value={data.huong}
+                    onChange={(e) => patch("huong")(e.target.value)}
+                  >
+                    <option value="" disabled hidden>
+                      Hướng
+                    </option>
+                    {[
+                      "dong",
+                      "tay",
+                      "nam",
+                      "bac",
+                      "dong-nam",
+                      "dong-bac",
+                      "tay-nam",
+                      "tay-bac",
+                    ].map((h) => (
+                      <option key={h} value={h}>
+                        {h.replace("-", " ").toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
+                    ▾
+                  </span>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    placeholder=" "
+                    value={(data as any)[k]}
+                    onChange={(e) => patch(k as any)(e.target.value)}
+                  />
+                  <label
+                    className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
+                                    peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                  >
+                    {label}
+                  </label>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* === THÔNG TIN KHÁC === */}
+      {/* THÔNG TIN KHÁC */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Thông tin khác</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tình trạng sổ / Giấy tờ pháp lý */}
+          {/* Giấy tờ pháp lý */}
           <div className="relative">
             <select
-              className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px]
-                          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
-                          ${
-                            tinhTrangSo === ""
-                              ? "text-gray-400"
-                              : "text-gray-900"
-                          }`}
-              value={tinhTrangSo}
-              onChange={(e) => setTinhTrangSo(e.target.value)}
+              className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none ${
+                data.tinhTrangSo === "" ? "text-gray-400" : "text-gray-900"
+              }`}
+              value={data.tinhTrangSo}
+              onChange={(e) => patch("tinhTrangSo")(e.target.value)}
             >
               <option value="" disabled hidden>
                 Giấy tờ pháp lý
@@ -362,13 +300,11 @@ export default function NhaNguyenCanForm() {
           {/* Tình trạng nội thất */}
           <div className="relative">
             <select
-              className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px]
-                          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
-                          ${
-                            noiThat === "" ? "text-gray-400" : "text-gray-900"
-                          }`}
-              value={noiThat}
-              onChange={(e) => setNoiThat(e.target.value)}
+              className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none ${
+                data.noiThat === "" ? "text-gray-400" : "text-gray-900"
+              }`}
+              value={data.noiThat}
+              onChange={(e) => patch("noiThat")(e.target.value)}
             >
               <option value="" disabled hidden>
                 Tình trạng nội thất
@@ -383,23 +319,24 @@ export default function NhaNguyenCanForm() {
           </div>
         </div>
 
-        {/* Checklist đặc điểm nhà/đất */}
+        {/* Checklist */}
         <div className="mt-4">
           <div className="text-[13px] text-gray-500 font-semibold mb-2">
             Đặc điểm nhà/đất
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-2">
-            {FEATURES.map((f, idx) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8">
+            {FEATURES.map((f, i) => (
               <label
                 key={f}
-                className={`flex items-center justify-between py-3 border-b border-gray-200 text-[15px]
-                  ${idx % 2 === 0 ? "md:pr-2" : "md:pl-2"}`}
+                className={`flex items-center justify-between py-3 border-b border-gray-200 text-[15px] ${
+                  i % 2 === 0 ? "md:pr-8" : "md:pl-8"
+                }`}
               >
-                <span>{f}</span>
+                <span className="truncate">{f}</span>
                 <input
                   type="checkbox"
-                  className="h-5 w-5 rounded-md border-gray-300"
-                  checked={featureSet.has(f)}
+                  className="h-5 w-5 shrink-0 rounded-md border-gray-300"
+                  checked={(data.featureSet ?? []).includes(f)} // <-- sửa
                   onChange={() => toggleFeature(f)}
                 />
               </label>
@@ -408,129 +345,73 @@ export default function NhaNguyenCanForm() {
         </div>
       </div>
 
-      {/* === DIỆN TÍCH & GIÁ === */}
+      {/* DIỆN TÍCH & GIÁ */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Diện tích & giá</h3>
 
-        {/* 2 hàng: (đất, sử dụng) và (ngang, dài) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Diện tích đất */}
-          <div className="relative">
-            <input
-              className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-12 text-[15px] placeholder-transparent focus:outline-none focus:ring-2
-                         ${
-                           err.dtDat
-                             ? "border-red-400 ring-red-100"
-                             : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
-                         }`}
-              placeholder=" "
-              value={dtDat}
-              onChange={(e) => setDtDat(e.target.value)}
-              onBlur={(e) =>
-                onBlurReq(
-                  "dtDat",
-                  e.target.value,
-                  "Vui lòng điền diện tích đất"
-                )
-              }
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Diện tích đất <span className="text-red-600">*</span>
-            </label>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-              m²
-            </span>
-            {err.dtDat && (
-              <div className="text-[12px] text-red-500 mt-1">{err.dtDat}</div>
-            )}
-          </div>
-
-          {/* Diện tích sử dụng */}
-          <div className="relative">
-            <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-12 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={dtSuDung}
-              onChange={(e) => setDtSuDung(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Diện tích sử dụng
-            </label>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-              m²
-            </span>
-          </div>
-
-          {/* Chiều ngang */}
-          <div className="relative">
-            <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-10 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={ngang}
-              onChange={(e) => setNgang(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Chiều ngang
-            </label>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-              m
-            </span>
-          </div>
-
-          {/* Chiều dài */}
-          <div className="relative">
-            <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-10 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              placeholder=" "
-              value={dai}
-              onChange={(e) => setDai(e.target.value)}
-            />
-            <label
-              className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
-            >
-              Chiều dài
-            </label>
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-              m
-            </span>
-          </div>
+          {/* Đất / Sử dụng */}
+          {[
+            ["dtDat", "Diện tích đất", "m²", true],
+            ["dtSuDung", "Diện tích sử dụng", "m²", false],
+            ["ngang", "Chiều ngang", "m", false],
+            ["dai", "Chiều dài", "m", false],
+          ].map(([k, label, unit, required]) => (
+            <div className="relative" key={k as string}>
+              <input
+                className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-12 placeholder-transparent focus:outline-none focus:ring-2 ${
+                  required && err.dtDat
+                    ? "border-red-400 ring-red-100"
+                    : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
+                }`}
+                placeholder=" "
+                value={(data as any)[k as string]}
+                onChange={(e) => patch(k as any)(e.target.value)}
+                onBlur={(e) =>
+                  required &&
+                  onBlurReq(
+                    "dtDat",
+                    e.target.value,
+                    "Vui lòng điền diện tích đất"
+                  )
+                }
+              />
+              <label
+                className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
+                                peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+              >
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+              </label>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                {unit as string}
+              </span>
+              {required && err.dtDat && (
+                <div className="text-[12px] text-red-500 mt-1">{err.dtDat}</div>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Giá & cọc */}
         <div className="mt-4">
           <div className="relative mb-3">
             <input
-              className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-20 text-[15px] placeholder-transparent focus:outline-none focus:ring-2
-                         ${
-                           err.price
-                             ? "border-red-400 ring-red-100"
-                             : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
-                         }`}
+              className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-20 placeholder-transparent focus:outline-none focus:ring-2 ${
+                err.price
+                  ? "border-red-400 ring-red-100"
+                  : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
+              }`}
               placeholder=" "
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
+              value={data.price}
+              onChange={(e) => patch("price")(e.target.value)}
               onBlur={(e) =>
                 onBlurReq("price", e.target.value, "Vui lòng điền giá thuê")
               }
             />
             <label
               className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                              peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
             >
               Giá thuê <span className="text-red-600">*</span>
             </label>
@@ -544,15 +425,14 @@ export default function NhaNguyenCanForm() {
 
           <div className="relative">
             <input
-              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-10 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-10 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder=" "
-              value={deposit}
-              onChange={(e) => setDeposit(e.target.value)}
+              value={data.deposit}
+              onChange={(e) => patch("deposit")(e.target.value)}
             />
             <label
               className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-                             peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                              peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
             >
               Số tiền cọc
             </label>
@@ -563,24 +443,22 @@ export default function NhaNguyenCanForm() {
         </div>
       </div>
 
-      {/* === TIÊU ĐỀ & MÔ TẢ === */}
+      {/* TIÊU ĐỀ & MÔ TẢ */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">
           Tiêu đề tin đăng và Mô tả chi tiết
         </h3>
-
         <div className="relative mb-1">
           <input
-            className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             placeholder=" "
             maxLength={70}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={data.title}
+            onChange={(e) => patch("title")(e.target.value)}
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                           peer-focus:top-[2px] peer-focus:text-xs
-                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                            peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Tiêu đề tin đăng <span className="text-red-600">*</span>
           </label>
@@ -589,16 +467,15 @@ export default function NhaNguyenCanForm() {
 
         <div className="relative">
           <textarea
-            className="peer w-full rounded-lg border border-gray-300 bg-white px-3 pt-5 min-h-[140px] text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="peer w-full rounded-lg border border-gray-300 bg-white px-3 pt-5 min-h-[140px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             placeholder=" "
             maxLength={1500}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
+            value={data.desc}
+            onChange={(e) => patch("desc")(e.target.value)}
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                           peer-focus:top-[2px] peer-focus:text-xs
-                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                            peer-focus:top-[2px] peer-focus:text-xs peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Mô tả chi tiết <span className="text-red-600">*</span>
           </label>
@@ -609,8 +486,8 @@ export default function NhaNguyenCanForm() {
       <AddressModal
         open={addrOpen}
         onClose={() => setAddrOpen(false)}
-        onSave={(a) => setAddr(a)}
-        initial={addr || undefined}
+        onSave={(a) => setData({ ...data, addr: a })}
+        initial={data.addr || undefined}
       />
     </div>
   );

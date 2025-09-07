@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
+/** DANH MỤC */
 export type CategoryId = "phong-tro" | "chung-cu" | "nha-nguyen-can";
 const CATEGORIES = [
   { id: "phong-tro", label: "Phòng trọ" },
@@ -9,8 +10,122 @@ const CATEGORIES = [
   { id: "nha-nguyen-can", label: "Nhà nguyên căn" },
 ] as const;
 
-const PhongTroForm = dynamic(() => import("./forms/phongtro"));
-const ChungCuForm = dynamic(() => import("./forms/chungcu"));
+/** Kiểu dữ liệu form */
+export type Address = {
+  city: string;
+  district: string;
+  ward: string;
+  street: string;
+  houseNumber: string;
+  showHouseNumber: boolean;
+};
+
+export type PhongTroData = {
+  addr: Address | null;
+  noiThat: "" | "full" | "co-ban" | "trong";
+  area: string;
+  price: string;
+  deposit: string;
+  title: string;
+  desc: string;
+};
+
+export type ChungCuData = {
+  // tạm tối thiểu; sau refactor form chung cư dùng data này
+  buildingName: string;
+  addr: Address | null;
+  blockOrTower: string;
+  floorNumber: string;
+  unitCode: string;
+  loaiHinh: string;
+  soPhongNgu: string;
+  soVeSinh: string;
+  huong: string;
+  noiThat: string;
+  tinhTrangSo: string;
+  area: string;
+  price: string;
+  deposit: string;
+  title: string;
+  desc: string;
+};
+
+export type NhaNguyenCanData = {
+  // tạm tối thiểu; sau refactor form nhà nguyên căn dùng data này
+  addr: Address | null;
+  khuLo: string;
+  unitCode: string;
+  loaiHinh: string;
+  soPhongNgu: string;
+  soVeSinh: string;
+  huong: string;
+  tongSoTang: string;
+  noiThat: string;
+  tinhTrangSo: string;
+  dtDat: string;
+  dtSuDung: string;
+  ngang: string;
+  dai: string;
+  price: string;
+  deposit: string;
+  title: string;
+  desc: string;
+  featureSet: string[];
+};
+
+/** init */
+const initPhongTro: PhongTroData = {
+  addr: null,
+  noiThat: "",
+  area: "",
+  price: "",
+  deposit: "",
+  title: "",
+  desc: "",
+};
+const initChungCu: ChungCuData = {
+  buildingName: "",
+  addr: null,
+  blockOrTower: "",
+  floorNumber: "",
+  unitCode: "",
+  loaiHinh: "",
+  soPhongNgu: "",
+  soVeSinh: "",
+  huong: "",
+  noiThat: "",
+  tinhTrangSo: "",
+  area: "",
+  price: "",
+  deposit: "",
+  title: "",
+  desc: "",
+};
+const initNNC: NhaNguyenCanData = {
+  addr: null,
+  khuLo: "",
+  unitCode: "",
+  loaiHinh: "",
+  soPhongNgu: "",
+  soVeSinh: "",
+  huong: "",
+  tongSoTang: "",
+  noiThat: "",
+  tinhTrangSo: "",
+  dtDat: "",
+  dtSuDung: "",
+  ngang: "",
+  dai: "",
+  price: "",
+  deposit: "",
+  title: "",
+  desc: "",
+  featureSet: [],
+};
+
+/** Lazy load form con */
+const PhongTroForm = dynamic(() => import("./forms/phongtro")); // nhận {data,setData}
+const ChungCuForm = dynamic(() => import("./forms/chungcu")); // TODO chuyển dần sang {data,setData}
 const NhaNguyenCanForm = dynamic(() => import("./forms/nhanguyencan"));
 
 /* Modal chọn danh mục */
@@ -62,7 +177,7 @@ function RulesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             Quy định
           </div>
           <div className="p-5 text-sm text-gray-700 leading-6">
-            Nội dung quy định sẽ bổ sung sau. (Modal mẫu)
+            Nội dung quy định sẽ bổ sung sau.
           </div>
           <div className="px-5 pb-4">
             <button
@@ -83,12 +198,18 @@ export default function PostForm() {
   const [showCateModal, setShowCateModal] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
-  // input file
+  // upload
   const imgRef = useRef<HTMLInputElement>(null);
   const vidRef = useRef<HTMLInputElement>(null);
   const [imgCount, setImgCount] = useState(0);
   const [vidName, setVidName] = useState("");
 
+  // STATE CHO 3 FORM
+  const [phongtroData, setPhongtroData] = useState<PhongTroData>(initPhongTro);
+  const [chungcuData, setChungcuData] = useState<ChungCuData>(initChungCu);
+  const [nncData, setNncData] = useState<NhaNguyenCanData>(initNNC);
+
+  // khởi tạo category
   useEffect(() => {
     const p = new URLSearchParams(location.search);
     const fromUrl = p.get("category") as CategoryId | null;
@@ -111,6 +232,7 @@ export default function PostForm() {
     history.replaceState({}, "", url.toString());
   }, [category]);
 
+  // CHỌN FORM & PROPS
   const ActiveForm = useMemo(() => {
     switch (category) {
       case "phong-tro":
@@ -123,6 +245,37 @@ export default function PostForm() {
         return null;
     }
   }, [category]);
+
+  const activeProps = useMemo(() => {
+    switch (category) {
+      case "phong-tro":
+        return { data: phongtroData, setData: setPhongtroData };
+      case "chung-cu":
+        return { data: chungcuData, setData: setChungcuData };
+      case "nha-nguyen-can":
+        return { data: nncData, setData: setNncData };
+      default:
+        return {};
+    }
+  }, [category, phongtroData, chungcuData, nncData]);
+
+  // SUBMIT CHỈ LẤY FORM ĐANG ACTIVE
+  const handleSubmit = () => {
+    let payload: any = {};
+    if (category === "phong-tro") payload = { category, ...phongtroData };
+    if (category === "chung-cu") payload = { category, ...chungcuData };
+    if (category === "nha-nguyen-can") payload = { category, ...nncData };
+    // TODO: call API
+    console.log("SUBMIT", payload);
+    alert("Submit: " + category);
+  };
+
+  // CLEAR chỉ form đang active
+  const handleClear = () => {
+    if (category === "phong-tro") setPhongtroData(initPhongTro);
+    if (category === "chung-cu") setChungcuData(initChungCu);
+    if (category === "nha-nguyen-can") setNncData(initNNC);
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-6 space-y-6">
@@ -153,7 +306,6 @@ export default function PostForm() {
         <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* LEFT: Upload */}
           <aside className="md:col-span-5 space-y-4">
-            {/* Tile ảnh */}
             <button
               onClick={() => imgRef.current?.click()}
               className="relative w-full rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/40 p-4 text-left"
@@ -205,7 +357,6 @@ export default function PostForm() {
               onChange={(e) => setImgCount(e.target.files?.length ?? 0)}
             />
 
-            {/* Tile video */}
             <button
               onClick={() => vidRef.current?.click()}
               className="relative w-full rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 p-4 text-left"
@@ -243,7 +394,6 @@ export default function PostForm() {
 
           {/* RIGHT: Danh mục + Form con */}
           <section className="md:col-span-7">
-            {/* Danh mục NHÚNG CHUNG TRONG FORM */}
             <div className="mb-5">
               <div className="text-sm font-medium text-gray-700 mb-2">
                 Danh mục Tin Đăng *
@@ -261,10 +411,29 @@ export default function PostForm() {
             </div>
 
             {ActiveForm ? (
-              <ActiveForm />
+              // tạm dùng any để không vỡ TS khi 2 form kia chưa refactor
+              <ActiveForm {...(activeProps as any)} />
             ) : (
               <div className="text-gray-500 text-center py-16 border rounded-2xl">
                 Chọn danh mục để bắt đầu.
+              </div>
+            )}
+
+            {/* NÚT Clear + Đăng tin (nằm ở parent) */}
+            {category && (
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  onClick={handleClear}
+                  className="h-11 px-4 rounded-xl border border-gray-300 hover:bg-gray-50"
+                >
+                  Clear form này
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className="h-11 px-5 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600"
+                >
+                  Đăng tin
+                </button>
               </div>
             )}
           </section>

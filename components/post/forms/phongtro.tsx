@@ -1,14 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-
-type Address = {
-  city: string;
-  district: string;
-  ward: string;
-  street: string;
-  houseNumber: string;
-  showHouseNumber: boolean;
-};
+import type { Address, PhongTroData } from "../PostForm";
 
 function AddressModal({
   open,
@@ -35,7 +27,7 @@ function AddressModal({
   const handleSave = () => {
     const allEmpty =
       !f.city && !f.district && !f.ward && !f.street && !f.houseNumber;
-    onSave(allEmpty ? null : f);
+    onSave(allEmpty ? null : (f as Address));
     onClose();
   };
 
@@ -48,27 +40,27 @@ function AddressModal({
             Địa chỉ
           </div>
           <div className="p-4 space-y-3">
-            {["city", "district", "ward", "street", "houseNumber"].map(
-              (k, i) => (
-                <input
-                  key={k}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder={
-                    k === "city"
-                      ? "Chọn tỉnh, thành phố *"
-                      : k === "district"
-                      ? "Chọn quận, huyện, thị xã *"
-                      : k === "ward"
-                      ? "Chọn phường, xã, thị trấn *"
-                      : k === "street"
-                      ? "Tên đường *"
-                      : "Số nhà"
-                  }
-                  value={(f as any)[k] as string}
-                  onChange={(e) => set(k as keyof Address, e.target.value)}
-                />
-              )
-            )}
+            {(
+              ["city", "district", "ward", "street", "houseNumber"] as const
+            ).map((k) => (
+              <input
+                key={k}
+                className="w-full h-11 px-3 rounded-lg border border-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                placeholder={
+                  k === "city"
+                    ? "Chọn tỉnh, thành phố *"
+                    : k === "district"
+                    ? "Chọn quận, huyện, thị xã *"
+                    : k === "ward"
+                    ? "Chọn phường, xã, thị trấn *"
+                    : k === "street"
+                    ? "Tên đường *"
+                    : "Số nhà"
+                }
+                value={f[k] as string}
+                onChange={(e) => set(k, e.target.value)}
+              />
+            ))}
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -90,35 +82,46 @@ function AddressModal({
   );
 }
 
-export default function PhongTroForm() {
+export default function PhongTroForm({
+  data,
+  setData,
+}: {
+  data: PhongTroData;
+  setData: (next: PhongTroData) => void;
+}) {
   const [addrOpen, setAddrOpen] = useState(false);
-  const [addr, setAddr] = useState<Address | null>(null);
-
-  const [noiThat, setNoiThat] = useState(""); // '' = placeholder, không lưu chữ placeholder
-  const [area, setArea] = useState(""); // m²
-  const [price, setPrice] = useState(""); // đ/tháng
-  const [deposit, setDeposit] = useState(""); // đ
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-
   const [err, setErr] = useState<{ area?: string; price?: string }>({});
+
   const onBlurRequired = (k: "area" | "price", v: string, m: string) =>
     setErr((s) => ({ ...s, [k]: v.trim() ? undefined : m }));
 
-  const titleCount = useMemo(() => `${title.length}/70 kí tự`, [title]);
-  const descCount = useMemo(() => `${desc.length}/1500 kí tự`, [desc]);
+  const titleCount = useMemo(
+    () => `${data.title.length}/70 kí tự`,
+    [data.title]
+  );
+  const descCount = useMemo(
+    () => `${data.desc.length}/1500 kí tự`,
+    [data.desc]
+  );
 
-  const addrText = addr
+  const addrText = data.addr
     ? [
-        addr.showHouseNumber && addr.houseNumber ? addr.houseNumber : "",
-        addr.street,
-        addr.ward,
-        addr.district,
-        addr.city,
+        data.addr.showHouseNumber && data.addr.houseNumber
+          ? data.addr.houseNumber
+          : "",
+        data.addr.street,
+        data.addr.ward,
+        data.addr.district,
+        data.addr.city,
       ]
         .filter(Boolean)
         .join(", ")
     : "";
+
+  const patch =
+    <K extends keyof PhongTroData>(k: K) =>
+    (v: PhongTroData[K]) =>
+      setData({ ...data, [k]: v });
 
   return (
     <div className="space-y-6">
@@ -128,10 +131,8 @@ export default function PhongTroForm() {
         <button
           type="button"
           onClick={() => setAddrOpen(true)}
-          className="w-full h-11 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50
-             flex items-center justify-between"
+          className="w-full h-11 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 flex items-center justify-between"
         >
-          {/* Trạng thái text bên trái */}
           <span className={addrText ? "text-gray-900" : "text-gray-400"}>
             {addrText ? (
               addrText
@@ -141,8 +142,6 @@ export default function PhongTroForm() {
               </>
             )}
           </span>
-
-          {/* Mũi tên */}
           <span className="opacity-60">▾</span>
         </button>
       </div>
@@ -150,16 +149,20 @@ export default function PhongTroForm() {
       {/* Thông tin khác */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Thông tin khác</h3>
-
         <div className="relative">
           <select
             className={`w-full h-11 px-3 pr-8 rounded-lg border border-gray-300 bg-white text-[15px]
-                focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
-                ${noiThat === "" ? "text-gray-400" : "text-gray-900"}`}
-            value={noiThat}
-            onChange={(e) => setNoiThat(e.target.value)}
+                        focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none
+                        ${
+                          data.noiThat === ""
+                            ? "text-gray-400"
+                            : "text-gray-900"
+                        }`}
+            value={data.noiThat}
+            onChange={(e) =>
+              patch("noiThat")(e.target.value as PhongTroData["noiThat"])
+            }
           >
-            {/* placeholder: chỉ hiện ở ô hiển thị, ẩn trong dropdown */}
             <option value="" disabled hidden>
               Tình trạng nội thất
             </option>
@@ -167,39 +170,35 @@ export default function PhongTroForm() {
             <option value="co-ban">Nội thất cơ bản</option>
             <option value="trong">Nhà trống</option>
           </select>
-          {/* mũi tên xích vào */}
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
             ▾
           </span>
         </div>
       </div>
 
-      {/* Diện tích & giá (floating label + đơn vị) */}
+      {/* Diện tích & giá */}
       <div>
         <h3 className="text-[20px] font-semibold mb-3">Diện tích & giá</h3>
 
-        {/* Diện tích */}
         <div className="relative mb-3">
           <input
-            className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-12 text-[15px] placeholder-transparent
-                focus:outline-none focus:ring-2
-                ${
-                  err.area
-                    ? "border-red-400 ring-red-100"
-                    : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
-                }`}
-            placeholder=" " // <- để dùng :placeholder-shown
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
+            className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-12 text-[15px] placeholder-transparent focus:outline-none focus:ring-2
+                       ${
+                         err.area
+                           ? "border-red-400 ring-red-100"
+                           : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
+                       }`}
+            placeholder=" "
+            value={data.area}
+            onChange={(e) => patch("area")(e.target.value)}
             onBlur={(e) =>
               onBlurRequired("area", e.target.value, "Vui lòng điền diện tích")
             }
           />
-          {/* cùng 1 vị trí cho focus và khi có value */}
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-               peer-focus:top-[2px] peer-focus:text-xs
-               peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                           peer-focus:top-[2px] peer-focus:text-xs
+                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Diện tích <span className="text-red-600">*</span>
           </label>
@@ -207,33 +206,29 @@ export default function PhongTroForm() {
             m²
           </span>
           {err.area && (
-            <div className="text-[12px] text-red-500 mt-1">
-              Vui lòng điền diện tích
-            </div>
+            <div className="text-[12px] text-red-500 mt-1">{err.area}</div>
           )}
         </div>
 
-        {/* Giá thuê */}
         <div className="relative mb-3">
           <input
-            className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-20 text-[15px] placeholder-transparent
-                focus:outline-none focus:ring-2
-                ${
-                  err.price
-                    ? "border-red-400 ring-red-100"
-                    : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
-                }`}
+            className={`peer w-full h-12 rounded-lg border bg-white px-3 pr-20 text-[15px] placeholder-transparent focus:outline-none focus:ring-2
+                       ${
+                         err.price
+                           ? "border-red-400 ring-red-100"
+                           : "border-gray-300 focus:ring-teal-500 focus:border-teal-500"
+                       }`}
             placeholder=" "
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            value={data.price}
+            onChange={(e) => patch("price")(e.target.value)}
             onBlur={(e) =>
               onBlurRequired("price", e.target.value, "Vui lòng điền giá thuê")
             }
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-               peer-focus:top-[2px] peer-focus:text-xs
-               peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                           peer-focus:top-[2px] peer-focus:text-xs
+                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Giá thuê <span className="text-red-600">*</span>
           </label>
@@ -241,24 +236,21 @@ export default function PhongTroForm() {
             đ/tháng
           </span>
           {err.price && (
-            <div className="text-[12px] text-red-500 mt-1">
-              Vui lòng điền giá thuê
-            </div>
+            <div className="text-[12px] text-red-500 mt-1">{err.price}</div>
           )}
         </div>
 
-        {/* Cọc */}
         <div className="relative">
           <input
             className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 pr-10 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             placeholder=" "
-            value={deposit}
-            onChange={(e) => setDeposit(e.target.value)}
+            value={data.deposit}
+            onChange={(e) => patch("deposit")(e.target.value)}
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-               peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                           peer-focus:top-[2px] peer-focus:text-xs
+                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Số tiền cọc
           </label>
@@ -279,13 +271,13 @@ export default function PhongTroForm() {
             className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             placeholder=" "
             maxLength={70}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={data.title}
+            onChange={(e) => patch("title")(e.target.value)}
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-               peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                           peer-focus:top-[2px] peer-focus:text-xs
+                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Tiêu đề tin đăng <span className="text-red-600">*</span>
           </label>
@@ -297,13 +289,13 @@ export default function PhongTroForm() {
             className="peer w-full rounded-lg border border-gray-300 bg-white px-3 pt-5 min-h-[140px] text-[15px] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
             placeholder=" "
             maxLength={1500}
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
+            value={data.desc}
+            onChange={(e) => patch("desc")(e.target.value)}
           />
           <label
             className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
-                             peer-focus:top-[2px] peer-focus:text-xs
-               peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
+                           peer-focus:top-[2px] peer-focus:text-xs
+                           peer-[&:not(:placeholder-shown)]:top-[2px] peer-[&:not(:placeholder-shown)]:text-xs"
           >
             Mô tả chi tiết <span className="text-red-600">*</span>
           </label>
@@ -311,18 +303,12 @@ export default function PhongTroForm() {
         <div className="text-xs text-gray-500 mt-1">{descCount}</div>
       </div>
 
-      {/* Submit */}
-      <div className="flex justify-end">
-        <button className="px-5 h-11 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600">
-          Đăng tin
-        </button>
-      </div>
-
+      {/* Modal địa chỉ */}
       <AddressModal
         open={addrOpen}
         onClose={() => setAddrOpen(false)}
-        onSave={(a) => setAddr(a)}
-        initial={addr || undefined}
+        onSave={(a) => setData({ ...data, addr: a })}
+        initial={data.addr || undefined}
       />
     </div>
   );
