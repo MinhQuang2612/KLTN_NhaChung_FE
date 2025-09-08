@@ -2,7 +2,7 @@ import { API_BASE } from "./api";
 
 export async function uploadFiles(
   files: File[],
-  userId: string,
+  userId: number,
   folder: "images" | "videos"
 ): Promise<string[]> {
   const uploadedUrls: string[] = [];
@@ -12,9 +12,9 @@ export async function uploadFiles(
     const token = localStorage.getItem("token");
     const presignRes = await fetch(`${API_BASE}/files/presign`, {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` })
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
       body: JSON.stringify({
         userId,

@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { Address, ChungCuData } from "../PostForm";
+import type { Address, ChungCuData } from "@/types/RentPost";
 
 /* Modal địa chỉ (giữ nguyên) */
 function AddressModal({
@@ -123,7 +123,10 @@ export default function ChungCuForm({
     setErr((s) => ({ ...s, [k]: v > 0 ? undefined : m }));
 
   // ✅ Helper function để convert string sang number
-  const handleNumberChange = (k: "area" | "price" | "deposit" | "bedrooms" | "bathrooms" | "floorNumber", value: string) => {
+  const handleNumberChange = (
+    k: "area" | "price" | "deposit" | "bedrooms" | "bathrooms" | "floorNumber",
+    value: string
+  ) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     patch(k)(numValue);
   };
@@ -176,7 +179,11 @@ export default function ChungCuForm({
               <input
                 className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder=" "
-                value={k === "floorNumber" ? (data as any)[k] || "" : (data as any)[k]}
+                value={
+                  k === "floorNumber"
+                    ? (data as any)[k] || ""
+                    : (data as any)[k]
+                }
                 onChange={(e) => {
                   if (k === "floorNumber") {
                     handleNumberChange("floorNumber", e.target.value);

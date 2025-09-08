@@ -1,11 +1,11 @@
 export interface User {
-  userId: number | string;
+  userId: number;
   name: string;
   email: string;
   phone?: string;
   role?: string;
   avatar?: string;
-  isVerified?: boolean;  // Trạng thái xác thực
+  isVerified?: boolean; // Trạng thái xác thực
   createdAt?: string;
   updatedAt?: string;
 }
@@ -33,7 +33,7 @@ export interface VerificationData {
   idNumber: string;
   fullName: string;
   dateOfBirth: string;
-  gender: 'male' | 'female';
+  gender: "male" | "female";
   issueDate: string;
   issuePlace: string;
 }
@@ -43,7 +43,7 @@ export interface VerificationResponse {
   verification: {
     verificationId: number;
     userId: number;
-    status: 'pending' | 'approved' | 'rejected';
+    status: "pending" | "approved" | "rejected";
     submittedAt: string;
     idNumber: string;
     fullName: string;
@@ -54,7 +54,7 @@ export interface VerificationStatus {
   isVerified: boolean;
   verification: {
     verificationId: number;
-    status: 'pending' | 'approved' | 'rejected';
+    status: "pending" | "approved" | "rejected";
     submittedAt: string;
     reviewedAt?: string;
     adminNote?: string;

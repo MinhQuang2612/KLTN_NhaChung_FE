@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { Address, PhongTroData } from "../PostForm";
+import type { Address, PhongTroData } from "@/types/RentPost";
 
 function AddressModal({
   open,
@@ -124,7 +124,10 @@ export default function PhongTroForm({
       setData({ ...data, [k]: v });
 
   // ✅ Helper function để convert string sang number
-  const handleNumberChange = (k: "area" | "price" | "deposit", value: string) => {
+  const handleNumberChange = (
+    k: "area" | "price" | "deposit",
+    value: string
+  ) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     patch(k)(numValue);
   };

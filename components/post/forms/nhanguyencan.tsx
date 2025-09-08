@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { Address, NhaNguyenCanData } from "../PostForm";
+import type { Address, NhaNguyenCanData } from "@/types/RentPost";
 
 const FEATURES = [
   "Hẻm xe hơi",
@@ -138,7 +138,19 @@ export default function NhaNguyenCanForm({
   };
 
   // ✅ Helper function để convert string sang number
-  const handleNumberChange = (k: "landArea" | "usableArea" | "width" | "length" | "price" | "deposit" | "bedrooms" | "bathrooms" | "totalFloors", value: string) => {
+  const handleNumberChange = (
+    k:
+      | "landArea"
+      | "usableArea"
+      | "width"
+      | "length"
+      | "price"
+      | "deposit"
+      | "bedrooms"
+      | "bathrooms"
+      | "totalFloors",
+    value: string
+  ) => {
     const numValue = value === "" ? 0 : parseFloat(value) || 0;
     patch(k)(numValue);
   };
@@ -264,7 +276,9 @@ export default function NhaNguyenCanForm({
                     className="peer w-full h-12 rounded-lg border border-gray-300 bg-white px-3 placeholder-transparent focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                     placeholder=" "
                     value={(data as any)[k] || ""}
-                    onChange={(e) => handleNumberChange(k as any, e.target.value)}
+                    onChange={(e) =>
+                      handleNumberChange(k as any, e.target.value)
+                    }
                   />
                   <label
                     className="pointer-events-none absolute left-3 top-3 text-gray-500 transition-all
@@ -396,7 +410,9 @@ export default function NhaNguyenCanForm({
                 {unit as string}
               </span>
               {required && err.landArea && (
-                <div className="text-[12px] text-red-500 mt-1">{err.landArea}</div>
+                <div className="text-[12px] text-red-500 mt-1">
+                  {err.landArea}
+                </div>
               )}
             </div>
           ))}

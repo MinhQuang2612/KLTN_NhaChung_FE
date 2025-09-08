@@ -4,7 +4,14 @@ import dynamic from "next/dynamic";
 import MediaPickerPanel, { LocalMediaItem } from "../common/MediaPickerLocal";
 import { uploadFiles } from "@/utils/upload";
 import { useAuth } from "@/contexts/AuthContext";
-
+import {
+  Address,
+  PhongTroData,
+  NhaNguyenCanData,
+  ChungCuData,
+} from "@/types/RentPost";
+import { initPhongTro, initChungCu, initNNC } from "@/types/RentPostInit";
+import { createRentPost } from "@/services/rentPosts";
 /** DANH MỤC */
 export type CategoryId = "phong-tro" | "chung-cu" | "nha-nguyen-can";
 const CATEGORIES = [
@@ -13,123 +20,18 @@ const CATEGORIES = [
   { id: "nha-nguyen-can", label: "Nhà nguyên căn" },
 ] as const;
 
-/** Kiểu dữ liệu form - ĐÃ CẬP NHẬT ĐỂ KHỚP VỚI BACKEND API */
-export type Address = {
-  city: string;
-  district: string;
-  ward: string;
-  street: string;
-  houseNumber: string;
-  showHouseNumber: boolean;
-};
-
-export type PhongTroData = {
-  addr: Address | null;
-  furniture: "" | "full" | "co-ban" | "trong"; // ✅ Đổi từ noiThat
-  area: number; // ✅ Đổi từ string sang number
-  price: number; // ✅ Đổi từ string sang number
-  deposit: number; // ✅ Đổi từ string sang number
-  title: string;
-  desc: string;
-};
-
-export type ChungCuData = {
-  buildingName: string;
-  addr: Address | null;
-  blockOrTower: string;
-  floorNumber: number; // ✅ Đổi từ string sang number
-  unitCode: string;
-  propertyType: string; // ✅ Đổi từ loaiHinh
-  bedrooms: number; // ✅ Đổi từ soPhongNgu
-  bathrooms: number; // ✅ Đổi từ soVeSinh
-  direction: string; // ✅ Đổi từ huong
-  furniture: string; // ✅ Đổi từ noiThat
-  legalStatus: string; // ✅ Đổi từ tinhTrangSo
-  area: number; // ✅ Đổi từ string sang number
-  price: number; // ✅ Đổi từ string sang number
-  deposit: number; // ✅ Đổi từ string sang number
-  title: string;
-  desc: string;
-};
-
-export type NhaNguyenCanData = {
-  addr: Address | null;
-  khuLo: string;
-  unitCode: string;
-  propertyType: string; // ✅ Đổi từ loaiHinh
-  bedrooms: number; // ✅ Đổi từ soPhongNgu
-  bathrooms: number; // ✅ Đổi từ soVeSinh
-  direction: string; // ✅ Đổi từ huong
-  totalFloors: number; // ✅ Đổi từ tongSoTang
-  furniture: string; // ✅ Đổi từ noiThat
-  legalStatus: string; // ✅ Đổi từ tinhTrangSo
-  landArea: number; // ✅ Đổi từ dtDat
-  usableArea: number; // ✅ Đổi từ dtSuDung
-  width: number; // ✅ Đổi từ ngang
-  length: number; // ✅ Đổi từ dai
-  price: number; // ✅ Đổi từ string sang number
-  deposit: number; // ✅ Đổi từ string sang number
-  title: string;
-  desc: string;
-  features: string[]; // ✅ Đổi từ featureSet
-};
-
-/** init - CẬP NHẬT VỚI KIỂU DỮ LIỆU MỚI */
-const initPhongTro: PhongTroData = {
-  addr: null,
-  furniture: "",
-  area: 0, // ✅ Đổi từ "" sang 0
-  price: 0, // ✅ Đổi từ "" sang 0
-  deposit: 0, // ✅ Đổi từ "" sang 0
-  title: "",
-  desc: "",
-};
-
-const initChungCu: ChungCuData = {
-  buildingName: "",
-  addr: null,
-  blockOrTower: "",
-  floorNumber: 0, // ✅ Đổi từ "" sang 0
-  unitCode: "",
-  propertyType: "", // ✅ Đổi từ loaiHinh
-  bedrooms: 0, // ✅ Đổi từ soPhongNgu
-  bathrooms: 0, // ✅ Đổi từ soVeSinh
-  direction: "", // ✅ Đổi từ huong
-  furniture: "", // ✅ Đổi từ noiThat
-  legalStatus: "", // ✅ Đổi từ tinhTrangSo
-  area: 0, // ✅ Đổi từ "" sang 0
-  price: 0, // ✅ Đổi từ "" sang 0
-  deposit: 0, // ✅ Đổi từ "" sang 0
-  title: "",
-  desc: "",
-};
-
-const initNNC: NhaNguyenCanData = {
-  addr: null,
-  khuLo: "",
-  unitCode: "",
-  propertyType: "", // ✅ Đổi từ loaiHinh
-  bedrooms: 0, // ✅ Đổi từ soPhongNgu
-  bathrooms: 0, // ✅ Đổi từ soVeSinh
-  direction: "", // ✅ Đổi từ huong
-  totalFloors: 0, // ✅ Đổi từ tongSoTang
-  furniture: "", // ✅ Đổi từ noiThat
-  legalStatus: "", // ✅ Đổi từ tinhTrangSo
-  landArea: 0, // ✅ Đổi từ dtDat
-  usableArea: 0, // ✅ Đổi từ dtSuDung
-  width: 0, // ✅ Đổi từ ngang
-  length: 0, // ✅ Đổi từ dai
-  price: 0, // ✅ Đổi từ "" sang 0
-  deposit: 0, // ✅ Đổi từ "" sang 0
-  title: "",
-  desc: "",
-  features: [], // ✅ Đổi từ featureSet
-};
-
 /** Lazy load form con */
 const PhongTroForm = dynamic(() => import("./forms/phongtro"));
 const ChungCuForm = dynamic(() => import("./forms/chungcu"));
 const NhaNguyenCanForm = dynamic(() => import("./forms/nhanguyencan"));
+
+// ở trên cùng file
+function validateMedia(imagesLen: number, videosLen: number): string | null {
+  if (imagesLen < 3) return "Cần tối thiểu 3 ảnh.";
+  if (imagesLen > 12) return "Tối đa 12 ảnh.";
+  if (videosLen > 2) return "Tối đa 2 video.";
+  return null;
+}
 
 /* Modal chọn danh mục */
 function CategoryModal({
@@ -204,16 +106,22 @@ export default function PostForm() {
   // upload
   const [images, setImages] = useState<LocalMediaItem[]>([]);
   const [videos, setVideos] = useState<LocalMediaItem[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [videoUrls, setVideoUrls] = useState<string[]>([]);
 
   // STATE CHO 3 FORM
   const [phongtroData, setPhongtroData] = useState<PhongTroData>(initPhongTro);
   const [chungcuData, setChungcuData] = useState<ChungCuData>(initChungCu);
   const [nncData, setNncData] = useState<NhaNguyenCanData>(initNNC);
 
+  // State submit form
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "" | "success" | "error";
+    text: string;
+  }>({ type: "", text: "" });
+
   // Auth context
   const { user } = useAuth();
+  const userId = user ? Number(user.userId) : null;
   // khởi tạo category
   useEffect(() => {
     const p = new URLSearchParams(location.search);
@@ -269,133 +177,132 @@ export default function PostForm() {
     if (!category) return;
 
     if (!user) {
-      alert("Bạn cần đăng nhập trước khi đăng tin");
+      setToast({ type: "error", text: "Bạn cần đăng nhập trước khi đăng tin" });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
+      return;
+    }
+    // BẮT BUỘC: tối thiểu 3 ảnh, tối đa 12; video tối đa 2
+    if (images.length < 3) {
+      setToast({ type: "error", text: "Vui lòng chọn tối thiểu 3 ảnh." });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
+      return;
+    }
+    if (images.length > 12) {
+      setToast({ type: "error", text: "Tối đa 12 ảnh." });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
+      return;
+    }
+    if (videos.length > 2) {
+      setToast({ type: "error", text: "Tối đa 2 video." });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
       return;
     }
 
-    const userId = user.userId; // ✅ lấy từ context
-
-    // 1. Upload trước
-    const imageUrls = await uploadFiles(
-      images.map((i) => i.file),
-      String(userId),
-      "images"
-    );
-    const videoUrls = await uploadFiles(
-      videos.map((v) => v.file),
-      String(userId),
-      "videos"
-    );
-
-    const basePayload = {
-      userId,
-      images: imageUrls,
-      videos: videoUrls,
-      status: "active",
-    };
-
-    let payload: any = {};
-
-    if (category === "phong-tro") {
-      if (!phongtroData.addr) {
-        alert("Vui lòng chọn địa chỉ");
-        return;
-      }
-      payload = {
-        ...basePayload,
-        title: phongtroData.title,
-        description: phongtroData.desc,
-        address: phongtroData.addr,
-        area: phongtroData.area,
-        price: phongtroData.price,
-        deposit: phongtroData.deposit,
-        furniture: phongtroData.furniture,
-      };
-    }
-
-    if (category === "chung-cu") {
-      if (!chungcuData.addr) {
-        alert("Vui lòng chọn địa chỉ");
-        return;
-      }
-      payload = {
-        ...basePayload,
-        title: chungcuData.title,
-        description: chungcuData.desc,
-        address: chungcuData.addr,
-        buildingInfo: {
-          buildingName: chungcuData.buildingName,
-          blockOrTower: chungcuData.blockOrTower,
-          floorNumber: chungcuData.floorNumber,
-          unitCode: chungcuData.unitCode,
-        },
-        area: chungcuData.area,
-        price: chungcuData.price,
-        deposit: chungcuData.deposit,
-        furniture: chungcuData.furniture,
-        bedrooms: chungcuData.bedrooms,
-        bathrooms: chungcuData.bathrooms,
-        direction: chungcuData.direction,
-        propertyType: chungcuData.propertyType,
-        legalStatus: chungcuData.legalStatus,
-      };
-    }
-
-    if (category === "nha-nguyen-can") {
-      if (!nncData.addr) {
-        alert("Vui lòng chọn địa chỉ");
-        return;
-      }
-      payload = {
-        ...basePayload,
-        title: nncData.title,
-        description: nncData.desc,
-        address: nncData.addr,
-        propertyInfo: {
-          khuLo: nncData.khuLo,
-          unitCode: nncData.unitCode,
-          propertyType: nncData.propertyType,
-          totalFloors: nncData.totalFloors,
-          features: nncData.features,
-        },
-        landArea: nncData.landArea,
-        usableArea: nncData.usableArea,
-        width: nncData.width,
-        length: nncData.length,
-        price: nncData.price,
-        deposit: nncData.deposit,
-        furniture: nncData.furniture,
-        bedrooms: nncData.bedrooms,
-        bathrooms: nncData.bathrooms,
-        direction: nncData.direction,
-        legalStatus: nncData.legalStatus,
-      };
-    }
-
+    const uid = Number(user.userId);
+    setSubmitting(true);
     try {
-      console.log("SUBMIT PAYLOAD:", payload);
+      // ✅ Upload trực tiếp từ images/videos
+      const uploadImageUrls = await uploadFiles(
+        images.map((i) => i.file),
+        uid,
+        "images"
+      );
+      const uploadVideoUrls = await uploadFiles(
+        videos.map((v) => v.file),
+        uid,
+        "videos"
+      );
 
-      // TODO: Uncomment khi đã có API endpoint
-      // const response = await fetch(`/api/rent-posts/${category}`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${getToken()}` // Lấy từ auth context
-      //   },
-      //   body: JSON.stringify(payload)
-      // });
+      const basePayload = {
+        userId: uid,
+        images: uploadImageUrls,
+        videos: uploadVideoUrls,
+        status: "active", // chờ duyệt
+      };
 
-      // if (!response.ok) {
-      //   throw new Error('Failed to create post');
-      // }
+      let payload: any = {};
+      if (category === "phong-tro") {
+        if (!phongtroData.addr) throw new Error("Vui lòng chọn địa chỉ");
+        payload = {
+          ...basePayload,
+          title: phongtroData.title,
+          description: phongtroData.desc,
+          address: phongtroData.addr,
+          area: phongtroData.area,
+          price: phongtroData.price,
+          deposit: phongtroData.deposit,
+          furniture: phongtroData.furniture,
+        };
+      } else if (category === "chung-cu") {
+        if (!chungcuData.addr) throw new Error("Vui lòng chọn địa chỉ");
+        payload = {
+          ...basePayload,
+          title: chungcuData.title,
+          description: chungcuData.desc,
+          address: chungcuData.addr,
+          buildingInfo: {
+            buildingName: chungcuData.buildingName,
+            blockOrTower: chungcuData.blockOrTower,
+            floorNumber: chungcuData.floorNumber,
+            unitCode: chungcuData.unitCode,
+          },
+          area: chungcuData.area,
+          price: chungcuData.price,
+          deposit: chungcuData.deposit,
+          furniture: chungcuData.furniture,
+          bedrooms: chungcuData.bedrooms,
+          bathrooms: chungcuData.bathrooms,
+          direction: chungcuData.direction,
+          propertyType: chungcuData.propertyType,
+          legalStatus: chungcuData.legalStatus,
+        };
+      } else if (category === "nha-nguyen-can") {
+        if (!nncData.addr) throw new Error("Vui lòng chọn địa chỉ");
+        payload = {
+          ...basePayload,
+          title: nncData.title,
+          description: nncData.desc,
+          address: nncData.addr,
+          propertyInfo: {
+            khuLo: nncData.khuLo,
+            unitCode: nncData.unitCode,
+            propertyType: nncData.propertyType,
+            totalFloors: nncData.totalFloors,
+            features: nncData.features,
+          },
+          landArea: nncData.landArea,
+          usableArea: nncData.usableArea,
+          width: nncData.width,
+          length: nncData.length,
+          price: nncData.price,
+          deposit: nncData.deposit,
+          furniture: nncData.furniture,
+          bedrooms: nncData.bedrooms,
+          bathrooms: nncData.bathrooms,
+          direction: nncData.direction,
+          legalStatus: nncData.legalStatus,
+        };
+      }
 
-      // const result = await response.json();
-      // console.log('Post created successfully:', result);
+      await createRentPost(category, payload);
 
-      alert(`Submit ${category} thành công!`);
-    } catch (error) {
-      console.error("Error creating post:", error);
-      alert("Có lỗi xảy ra khi tạo bài đăng");
+      setToast({
+        type: "success",
+        text: "Lưu tin đăng thành công, chờ duyệt!",
+      });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
+
+      // ✅ clear sau khi thành công
+      clearOnlyActiveForm();
+      clearAllMedia();
+    } catch (e: any) {
+      setToast({
+        type: "error",
+        text: e?.message || "Có lỗi xảy ra khi tạo bài đăng",
+      });
+      setTimeout(() => setToast({ type: "", text: "" }), 3000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -407,27 +314,35 @@ export default function PostForm() {
     setImages([]);
     setVideos([]);
   };
-
-  const handleUploadImages = async () => {
-    const urls = await uploadFiles(
-      images.map((i) => i.file),
-      "1",
-      "images"
-    );
-    setImageUrls(urls);
+  const clearOnlyActiveForm = () => {
+    if (category === "phong-tro") setPhongtroData(initPhongTro);
+    if (category === "chung-cu") setChungcuData(initChungCu);
+    if (category === "nha-nguyen-can") setNncData(initNNC);
   };
 
-  const handleUploadVideos = async () => {
-    const urls = await uploadFiles(
-      videos.map((v) => v.file),
-      "1",
-      "videos"
-    );
-    setVideoUrls(urls);
+  const clearAllMedia = () => {
+    setImages([]);
+    setVideos([]);
+  };
+
+  // tiện ích hiện toast 3s
+  const showToast = (type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast({ type: "", text: "" }), 3000);
   };
 
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-6 space-y-6">
+      {toast.type && (
+        <div
+          className={`fixed top-10 right-4 z-[100] rounded-lg px-4 py-3 shadow ${
+            toast.type === "success" ? "bg-amber-400" : "bg-rose-600"
+          } text-white`}
+        >
+          {toast.text}
+        </div>
+      )}
+
       <CategoryModal
         open={showCateModal}
         onClose={() => setShowCateModal(false)}
@@ -517,14 +432,16 @@ export default function PostForm() {
                 <button
                   onClick={handleClear}
                   className="h-11 px-4 rounded-xl border border-gray-300 hover:bg-gray-50"
+                  disabled={submitting}
                 >
                   Clear form này
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="h-11 px-5 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600"
+                  className="h-11 px-5 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600 disabled:opacity-60"
+                  disabled={submitting}
                 >
-                  Đăng tin
+                  {submitting ? "Đang đăng..." : "Đăng tin"}
                 </button>
               </div>
             )}
