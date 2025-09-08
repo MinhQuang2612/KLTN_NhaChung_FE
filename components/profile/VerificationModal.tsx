@@ -462,7 +462,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
                   </label>
                   <input
                     type="text"
-                    value={formData.issuePlace || 'Cục Cảnh sát quản lý hành chính về trật tự xã hội'}
+                    value={formData.issuePlace || 'Cục cảnh sát quản lý hành chính về trật tự xã hội'}
                     onChange={(e) => handleInputChange('issuePlace', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                     placeholder="Nơi cấp CCCD/CMND"
