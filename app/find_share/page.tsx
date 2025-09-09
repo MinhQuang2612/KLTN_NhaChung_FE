@@ -4,6 +4,8 @@ import FilterSidebar from "../../components/find_share/FilterSidebar";
 import Suggestions from "../../components/common/Suggestions";
 import Footer from "../../components/common/Footer";
 
+export const metadata = { title: "Tìm phòng trọ, ở ghép" };
+
 export default function FindSharePage() {
   return (
     <div className="min-h-screen bg-gray-50">

@@ -1,6 +1,42 @@
 "use client";
 
-export default function PropertyDetails() {
+interface PropertyDetailsProps {
+  postData: any;
+  postType: 'rent' | 'roommate';
+}
+
+export default function PropertyDetails({ postData, postType }: PropertyDetailsProps) {
+  // Helper function to get address string
+  const getAddressString = () => {
+    if (postType === 'rent' && postData?.address) {
+      const addr = postData.address;
+      return `${addr.houseNumber || ''} ${addr.street}, ${addr.ward}, ${addr.district}, ${addr.city}`.trim();
+    } else if (postType === 'roommate' && postData?.currentRoom?.address) {
+      return postData.currentRoom.address;
+    }
+    return 'Chưa có thông tin địa chỉ';
+  };
+
+  // Helper function to get price
+  const getPriceString = () => {
+    if (postType === 'rent' && postData?.basicInfo?.price) {
+      return `${(postData.basicInfo.price / 1000000).toFixed(1)} triệu / tháng`;
+    } else if (postType === 'roommate' && postData?.currentRoom?.price) {
+      return `${(postData.currentRoom.price / 1000000).toFixed(1)} triệu / tháng`;
+    }
+    return 'Chưa có thông tin giá';
+  };
+
+  // Helper function to get area
+  const getAreaString = () => {
+    if (postType === 'rent' && postData?.basicInfo?.area) {
+      return `${postData.basicInfo.area} m²`;
+    } else if (postType === 'roommate' && postData?.currentRoom?.area) {
+      return `${postData.currentRoom.area} m²`;
+    }
+    return 'Chưa có thông tin diện tích';
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       {/* Thông Tin Chính */}
@@ -9,15 +45,15 @@ export default function PropertyDetails() {
         <div className="border-t border-gray-200 pt-3 space-y-2">
           <div className="flex justify-between">
             <span className="text-gray-600">Địa Chỉ:</span>
-            <span className="text-gray-900">268 Đ. Tô Hiến Thành, Phường Diên Hồng, TP. Hồ Chí Minh</span>
+            <span className="text-gray-900">{getAddressString()}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Giá Cho Thuê:</span>
-            <span className="text-gray-900 font-semibold text-red-600">3,5 triệu / tháng</span>
+            <span className="text-gray-900 font-semibold text-red-600">{getPriceString()}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Diện tích:</span>
-            <span className="text-gray-900">20 m²</span>
+            <span className="text-gray-900">{getAreaString()}</span>
           </div>
         </div>
       </div>
@@ -28,19 +64,50 @@ export default function PropertyDetails() {
         <div className="border-t border-gray-200 pt-3 space-y-2">
           <div className="flex justify-between">
             <span className="text-gray-600">Số Phòng Ngủ:</span>
-            <span className="text-gray-900">1 phòng</span>
+            <span className="text-gray-900">
+              {postType === 'rent' && postData?.basicInfo?.bedrooms 
+                ? `${postData.basicInfo.bedrooms} phòng` 
+                : '1 phòng'}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Nhà Vệ Sinh:</span>
-            <span className="text-gray-900">1 WC</span>
+            <span className="text-gray-900">
+              {postType === 'rent' && postData?.basicInfo?.bathrooms 
+                ? `${postData.basicInfo.bathrooms} WC` 
+                : '1 WC'}
+            </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Tầng/Lầu:</span>
-            <span className="text-gray-900">Tầng trệt</span>
-          </div>
+          {postType === 'rent' && postData?.basicInfo?.direction && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Hướng:</span>
+              <span className="text-gray-900">
+                {postData.basicInfo.direction === 'dong' ? 'Đông' :
+                 postData.basicInfo.direction === 'tay' ? 'Tây' :
+                 postData.basicInfo.direction === 'nam' ? 'Nam' :
+                 postData.basicInfo.direction === 'bac' ? 'Bắc' :
+                 postData.basicInfo.direction}
+              </span>
+            </div>
+          )}
+          {postType === 'rent' && postData?.basicInfo?.furniture && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Nội thất:</span>
+              <span className="text-gray-900">
+                {postData.basicInfo.furniture === 'full' ? 'Đầy đủ' :
+                 postData.basicInfo.furniture === 'co-ban' ? 'Cơ bản' :
+                 postData.basicInfo.furniture === 'trong' ? 'Trống' :
+                 postData.basicInfo.furniture}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-gray-600">Ngày Đăng:</span>
-            <span className="text-gray-900">Hôm nay</span>
+            <span className="text-gray-900">
+              {postData?.createdAt 
+                ? new Date(postData.createdAt).toLocaleDateString('vi-VN')
+                : 'Chưa có thông tin'}
+            </span>
           </div>
         </div>
       </div>
@@ -49,32 +116,15 @@ export default function PropertyDetails() {
       <div className="mb-6">
         <h3 className="text-lg font-bold text-gray-900 mb-3">Thông Tin Thêm</h3>
         <div className="border-t border-gray-200 pt-3">
-          <ul className="space-y-2 text-gray-700">
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Thích hợp ở gia đình, nhóm sinh viên, công nhân viên,....</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Nấu ăn - Bồn rửa chén</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Wifi, cáp</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Không giới hạn số người ở</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Chổ để xe rộng, bảo vệ an ninh</span>
-            </li>
-            <li className="flex items-start">
-              <span className="text-gray-400 mr-2">•</span>
-              <span>Có hệ thống camera, PCCC đầy đủ</span>
-            </li>
-          </ul>
+          {postData?.description ? (
+            <div className="text-gray-700 leading-relaxed">
+              {postData.description.split('\n').map((line: string, index: number) => (
+                <p key={index} className="mb-2">{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 italic">Chưa có mô tả chi tiết</p>
+          )}
         </div>
       </div>
 

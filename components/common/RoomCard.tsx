@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RoomCardData } from "@/types/RentPostApi";
+import { useFavorites } from "../../contexts/FavoritesContext";
 import { formatPrice } from "@/utils/format";
 
 export default function RoomCard({
@@ -20,10 +21,15 @@ export default function RoomCard({
   isVerified,
 }: RoomCardData) {
   const router = useRouter();
-  const [fav, setFav] = useState(false);
+  const { isFavorited, toggleFavorite } = useFavorites();
+  
+  // Check if this post is favorited  
+  const postType = category === 'roommate' ? 'roommate' : 'rent';
+  const isFav = isFavorited(postType, rentPostId);
 
   const goDetail = () => {
-    router.push(`/room_details?id=${rentPostId}&type=${category}`);
+    const postType = category === 'roommate' ? 'roommate' : 'rent';
+    router.push(`/room_details/${postType}-${rentPostId}`);
   };
 
   return (
@@ -58,20 +64,22 @@ export default function RoomCard({
         {/* Fav / Share */}
         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              setFav((v) => !v);
+              // Determine post type based on category
+              const postType = category === 'roommate' ? 'roommate' : 'rent';
+              await toggleFavorite(postType, rentPostId);
             }}
             className={`p-2 rounded-full transition-all duration-300 hover:scale-110 ${
-              fav
+              isFav
                 ? "bg-red-500 text-white shadow-lg"
                 : "bg-white/95 text-gray-600 hover:bg-white hover:shadow-lg"
             }`}
-            aria-label="Yêu thích"
+            aria-label={isFav ? "Bỏ yêu thích" : "Yêu thích"}
           >
             <svg
               className="w-4 h-4"
-              fill={fav ? "currentColor" : "none"}
+              fill={isFav ? "currentColor" : "none"}
               stroke="currentColor"
               viewBox="0 0 24 24"
             >

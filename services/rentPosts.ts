@@ -1,4 +1,4 @@
-import { apiPost, apiGet } from "@/utils/api";
+import { apiPost, apiGet, apiPut } from "@/utils/api";
 
 export async function createRentPost(category: string, payload: any) {
   return apiPost(`rent-posts/${category}`, payload);
@@ -13,7 +13,21 @@ export async function listRentPosts(params: Record<string, any> = {}) {
   return apiGet<any>(url); // trả raw từ BE
 }
 
+// GET user's posts: /rent-posts?userId={userId}
+export async function getUserRentPosts(userId: number | string, params: Record<string, any> = {}) {
+  const queryParams = {
+    userId: userId,
+    ...params
+  };
+  return listRentPosts(queryParams);
+}
+
 // (nếu cần) GET by id: /rent-posts/:id
 export async function getRentPostById(id: string) {
   return apiGet<any>(`rent-posts/${id}`); // trả raw
+}
+
+// UPDATE rent post by id: PUT /rent-posts/:id
+export async function updateRentPost(id: number, data: any) {
+  return apiPut<any>(`rent-posts/${id}`, data);
 }

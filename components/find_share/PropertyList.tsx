@@ -3,16 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import RoomCard from "@/components/common/RoomCard";
 import { listRentPosts } from "@/services/rentPosts";
-import { rentPostToRoomCard } from "@/utils/mappers/rentPostToRoomCard";
-import type { RoomCardData } from "@/types/RentPostApi";
+import { listRoommatePosts } from "@/services/roommatePosts";
+import { rentPostToUnified, roommatePostToUnified, shuffleArray, UnifiedPost } from "@/types/MixedPosts";
+import type { RentPostApi } from "@/types/RentPostApi";
+import type { RoommatePost } from "@/services/roommatePosts";
 
-type SortKey = "newest" | "priceAsc" | "priceDesc" | "areaDesc";
+type SortKey = "random" | "newest" | "priceAsc" | "priceDesc" | "areaDesc";
 
 export default function RoomList() {
-  const [items, setItems] = useState<RoomCardData[]>([]);
+  const [items, setItems] = useState<UnifiedPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>("");
-  const [sort, setSort] = useState<SortKey>("newest");
+  const [sort, setSort] = useState<SortKey>("random");
 
   // pagination 3x3
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,16 +27,47 @@ export default function RoomList() {
         setLoading(true);
         setErr("");
 
-        const res = await listRentPosts(); // raw: [] hoặc { data: [] }
-        const raw = Array.isArray((res as any)?.data)
-          ? (res as any).data
-          : Array.isArray(res)
-          ? (res as any)
-          : [];
+        // Gọi cả 2 APIs đồng thời
+        const [rentResponse, roommateResponse] = await Promise.allSettled([
+          listRentPosts(),
+          listRoommatePosts()
+        ]);
 
-        const mapped: RoomCardData[] = raw.map(rentPostToRoomCard);
+        const rentPosts: RentPostApi[] = [];
+        const roommatePosts: RoommatePost[] = [];
+
+        // Xử lý kết quả rent posts
+        if (rentResponse.status === 'fulfilled') {
+          const rentData = rentResponse.value;
+          const rentRaw = Array.isArray((rentData as any)?.data)
+            ? (rentData as any).data
+            : Array.isArray(rentData)
+            ? (rentData as any)
+            : [];
+          rentPosts.push(...rentRaw);
+        }
+
+        // Xử lý kết quả roommate posts
+        if (roommateResponse.status === 'fulfilled') {
+          const roommateData = roommateResponse.value;
+          const roommateRaw = Array.isArray((roommateData as any)?.data)
+            ? (roommateData as any).data
+            : Array.isArray(roommateData)
+            ? (roommateData as any)
+            : [];
+          roommatePosts.push(...roommateRaw);
+        }
+
+        // Convert to unified format và mix ngẫu nhiên
+        const unifiedRentPosts = rentPosts.map(rentPostToUnified);
+        const unifiedRoommatePosts = roommatePosts.map(roommatePostToUnified);
+        
+        // Kết hợp và shuffle
+        const allPosts = [...unifiedRentPosts, ...unifiedRoommatePosts];
+        const shuffledPosts = shuffleArray(allPosts);
+
         if (!cancelled) {
-          setItems(mapped);
+          setItems(shuffledPosts);
           setCurrentPage(1);
         }
       } catch (e: any) {
@@ -52,6 +85,9 @@ export default function RoomList() {
   const sorted = useMemo(() => {
     const a = [...items];
     switch (sort) {
+      case "random":
+        // Giữ nguyên thứ tự shuffle từ API load
+        return a;
       case "priceAsc":
         a.sort(
           (x, y) =>
@@ -70,8 +106,7 @@ export default function RoomList() {
         a.sort((x, y) => (y.area ?? 0) - (x.area ?? 0));
         break;
       case "newest":
-      default:
-        a.sort((x, y) => (y.rentPostId ?? 0) - (x.rentPostId ?? 0)); // tạm coi id giảm dần là mới
+        a.sort((x, y) => (y.id ?? 0) - (x.id ?? 0)); // tạm coi id giảm dần là mới
         break;
     }
     return a;
@@ -111,6 +146,7 @@ export default function RoomList() {
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-teal-500"
           >
+            <option value="random">Ngẫu nhiên</option>
             <option value="newest">Mới nhất</option>
             <option value="priceAsc">Giá tăng dần</option>
             <option value="priceDesc">Giá giảm dần</option>
@@ -131,7 +167,21 @@ export default function RoomList() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {current.map((it) => (
-              <RoomCard key={`${it.category}-${it.rentPostId}`} {...it} />
+              <RoomCard 
+                key={`${it.type}-${it.id}`} 
+                rentPostId={it.id}
+                category={it.category as any || it.type as any}
+                title={it.title}
+                cover={it.images[0] || "/home/room1.png"}
+                photoCount={it.photoCount}
+                area={it.area}
+                bedrooms={it.bedrooms || 0}
+                bathrooms={it.bathrooms || 0}
+                district={it.location.split(',')[0]?.trim() || ''}
+                city={it.location.split(',')[1]?.trim() || ''}
+                price={it.price}
+                isVerified={it.isVerified || false}
+              />
             ))}
           </div>
 
@@ -206,8 +256,7 @@ export default function RoomList() {
           )}
 
           <div className="text-center text-sm text-gray-600">
-            Hiển thị {startIndex + 1}-{endIndex} trong tổng số {sorted.length}{" "}
-            bài
+            Hiển thị {startIndex + 1}-{endIndex} trong tổng số {sorted.length} bài
           </div>
         </>
       )}

@@ -15,6 +15,7 @@ interface Favorite {
   addedAt: string;
   images: string[];
   description: string;
+  postType?: string;
 }
 
 interface FavoritesContentProps {
@@ -66,11 +67,20 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
     { id: "phong-tro", label: "Phòng trọ", count: favorites.filter(f => f.category === "phong-tro").length },
     { id: "chung-cu", label: "Chung cư", count: favorites.filter(f => f.category === "chung-cu").length },
     { id: "nha-nguyen-can", label: "Nhà nguyên căn", count: favorites.filter(f => f.category === "nha-nguyen-can").length },
+    { id: "roommate", label: "Ở ghép", count: favorites.filter(f => f.category === "roommate").length },
   ];
+
+  const scrollToTop = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(scrollToTop, 80);
   };
 
   const handleFilterChange = (category: string) => {
@@ -93,55 +103,50 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header with Stats and Sort */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Danh sách yêu thích</h2>
-            <p className="text-gray-600">Bạn đã lưu {favorites.length} phòng trọ</p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Sắp xếp:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => handleSortChange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-            >
-              <option value="newest">Mới nhất</option>
-              <option value="oldest">Cũ nhất</option>
-              <option value="price-low">Giá thấp → cao</option>
-              <option value="price-high">Giá cao → thấp</option>
-            </select>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Header & Filters */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* Category Filter */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">Lọc theo loại:</span>
+              <div className="flex gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleFilterChange(category.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      filterCategory === category.id
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {category.label} ({category.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">Sắp xếp:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white"
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="price-low">Giá thấp → cao</option>
+                <option value="price-high">Giá cao → thấp</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Category Filter */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => handleFilterChange(category.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterCategory === category.id
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category.label}
-              <span className="ml-2 bg-white/20 text-xs px-2 py-0.5 rounded-full">
-                {category.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Favorites Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Favorites Grid */}
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {paginatedFavorites.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -214,18 +219,21 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
             </div>
           ))
         )}
-      </div>
+          </div>
+        </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          itemsPerPage={itemsPerPage}
-          totalItems={sortedFavorites.length}
-        />
-      )}
-    </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              itemsPerPage={itemsPerPage}
+              totalItems={sortedFavorites.length}
+            />
+          </div>
+        )}
+      </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Address } from "./RentPost";
 
-export type Category = "phong-tro" | "chung-cu" | "nha-nguyen-can";
+export type Category = "phong-tro" | "chung-cu" | "nha-nguyen-can" | "roommate";
 export type CategoryId = Category;
 
 export type BasicInfo = {

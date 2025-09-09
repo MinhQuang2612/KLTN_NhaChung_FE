@@ -1,6 +1,8 @@
 import PostForm from "../../../components/post/PostForm";
 import Footer from "../../../components/common/Footer";
 
+export const metadata = { title: "Đăng tin cho thuê phòng" };
+
 export default function RentPostPage() {
   return (
     <div className="min-h-screen bg-gray-50">

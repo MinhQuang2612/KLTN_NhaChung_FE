@@ -1,6 +1,8 @@
 import RoommateForm from '../../../components/post/RoommateForm';
 import Footer from '../../../components/common/Footer';
 
+export const metadata = { title: "Đăng tin tìm người ở ghép" };
+
 export default function RoommatePostPage() {
   return (
     <div className="min-h-screen bg-gray-50">

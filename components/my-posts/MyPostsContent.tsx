@@ -2,7 +2,11 @@
 
 import { useState, useMemo } from "react";
 import Pagination from "../common/Pagination";
+import { RentPostApi } from "../../types/RentPostApi";
+import { RoommatePost } from "../../services/roommatePosts";
+import EditPostModal from "./EditPostModal";
 
+// Legacy interface để tương thích với mock data
 interface Post {
   id: number;
   title: string;
@@ -14,25 +18,83 @@ interface Post {
   views: number;
   createdAt: string;
   images: string[];
+  postType?: string;
 }
 
 interface MyPostsContentProps {
-  posts: Post[];
+  posts: (Post | RentPostApi | RoommatePost)[];
   onEdit: (id: number) => void;
   onView: (id: number) => void;
   onDelete: (id: number) => void;
+  onRefresh: () => void;
 }
 
-export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPostsContentProps) {
+// Helper function để chuẩn hóa data từ API và mock
+const normalizePost = (post: Post | RentPostApi | RoommatePost): Post => {
+  if ('rentPostId' in post) {
+    // Đây là RentPostApi từ backend
+    const api = post as RentPostApi;
+    return {
+      id: api.rentPostId,
+      title: api.title,
+      category: api.category,
+      price: api.basicInfo.price,
+      area: api.basicInfo.area,
+      address: `${api.address.district}, ${api.address.city}`,
+      status: api.status as "active" | "pending" | "inactive",
+      views: 0, // Backend chưa có field views
+      createdAt: new Date(api.createdAt).toISOString().split('T')[0], // Format date
+      images: api.images || [],
+      postType: 'rent'
+    };
+  } else if ('currentRoom' in post) {
+    // Đây là RoommatePost từ backend
+    const roommate = post as RoommatePost;
+    const roommatePostId = (roommate as any).roommatePostId || roommate.postId;
+    return {
+      id: roommatePostId,
+      title: roommate.title,
+      category: 'roommate', // Đánh dấu là roommate post
+      price: roommate.currentRoom.price,
+      area: roommate.currentRoom.area,
+      address: roommate.currentRoom.address,
+      status: "active", // Roommate posts default active
+      views: 0, // Backend chưa có field views  
+      createdAt: new Date(roommate.createdAt).toISOString().split('T')[0], // Format date
+      images: roommate.images || [],
+      postType: 'roommate'
+    };
+  } else {
+    // Đây là mock data
+    return post as Post;
+  }
+};
+
+export default function MyPostsContent({ posts, onEdit, onView, onDelete, onRefresh }: MyPostsContentProps) {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "pending" | "inactive">("all");
+  const [postTypeFilter, setPostTypeFilter] = useState<"all" | "rent" | "roommate">("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
   const itemsPerPage = 5;
 
   const filteredPosts = useMemo(() => {
-    return activeTab === "all" 
-      ? posts 
-      : posts.filter(post => post.status === activeTab);
-  }, [posts, activeTab]);
+    let normalizedPosts = posts.map(normalizePost);
+    
+    // Filter by post type first
+    if (postTypeFilter === "rent") {
+      normalizedPosts = normalizedPosts.filter(post => post.category !== "roommate");
+    } else if (postTypeFilter === "roommate") {
+      normalizedPosts = normalizedPosts.filter(post => post.category === "roommate");
+    }
+    
+    // Then filter by status
+    if (activeTab === "all") {
+      return normalizedPosts;
+    } else {
+      return normalizedPosts.filter(post => post.status === activeTab);
+    }
+  }, [posts, activeTab, postTypeFilter]);
 
   const paginatedPosts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -43,8 +105,17 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPo
   const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
 
   const getTabCount = (status: string) => {
-    if (status === "all") return posts.length;
-    return posts.filter(post => post.status === status).length;
+    let normalizedPosts = posts.map(normalizePost);
+    
+    // Apply post type filter first
+    if (postTypeFilter === "rent") {
+      normalizedPosts = normalizedPosts.filter(post => post.category !== "roommate");
+    } else if (postTypeFilter === "roommate") {
+      normalizedPosts = normalizedPosts.filter(post => post.category === "roommate");
+    }
+    
+    if (status === "all") return normalizedPosts.length;
+    return normalizedPosts.filter(post => post.status === status).length;
   };
 
   const tabCounts = {
@@ -54,13 +125,46 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPo
     inactive: getTabCount("inactive"),
   };
 
+  const scrollToTop = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(scrollToTop, 80);
+  };
+
+  const handleEdit = (post: any) => {
+    // Find original post data (not normalized)
+    const originalPost = posts.find(p => 
+      ('rentPostId' in p && p.rentPostId === post.id) ||
+      ('roommatePostId' in p && (p as any).roommatePostId === post.id) ||
+      ('postId' in p && (p as any).postId === post.id)
+    );
+    setSelectedPost(originalPost);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setEditModalOpen(false);
+    setSelectedPost(null);
+  };
+
+  const handleEditSuccess = () => {
+    onRefresh(); // Refresh data from parent
   };
 
   const handleTabChange = (tab: "all" | "active" | "pending" | "inactive") => {
     setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  const handlePostTypeChange = (type: "all" | "rent" | "roommate") => {
+    setPostTypeFilter(type);
     setCurrentPage(1);
   };
 
@@ -94,60 +198,88 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPo
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <span className="text-blue-600 text-xl">✓</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-600 text-sm font-medium">Tổng bài đăng</p>
+              <p className="text-3xl font-bold text-blue-700">{posts.length}</p>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Tổng bài đăng</p>
-              <p className="text-2xl font-bold text-gray-900">{posts.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <span className="text-green-600 text-xl">✓</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Đang hiển thị</p>
-              <p className="text-2xl font-bold text-gray-900">{tabCounts.active}</p>
+            <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">📋</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <span className="text-yellow-600 text-xl">⏰</span>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-600 text-sm font-medium">Đang hiển thị</p>
+              <p className="text-3xl font-bold text-green-700">{tabCounts.active}</p>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Chờ duyệt</p>
-              <p className="text-2xl font-bold text-gray-900">{tabCounts.pending}</p>
+            <div className="w-12 h-12 bg-green-200 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">✅</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <span className="text-purple-600 text-xl">👁️</span>
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-amber-600 text-sm font-medium">Chờ duyệt</p>
+              <p className="text-3xl font-bold text-amber-700">{tabCounts.pending}</p>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Lượt xem</p>
-              <p className="text-2xl font-bold text-gray-900">{posts.reduce((sum, post) => sum + post.views, 0)}</p>
+            <div className="w-12 h-12 bg-amber-200 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">⏱️</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-600 text-sm font-medium">Lượt xem</p>
+              <p className="text-3xl font-bold text-purple-700">0</p>
+            </div>
+            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">👁️</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+      {/* Main Content */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+
+      {/* Filters Row */}
+      <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          {/* Post Type Filter */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 min-w-0">Lọc theo loại bài đăng</span>
+            <div className="flex gap-2">
+              {[
+                { id: "all", label: "Tất cả" },
+                { id: "rent", label: "Cho thuê" },
+                { id: "roommate", label: "Ở ghép" },
+              ].map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => handlePostTypeChange(type.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    postTypeFilter === type.id
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="flex gap-1 ml-auto">
             {[
               { id: "all", label: "Tất cả", count: tabCounts.all },
               { id: "active", label: "Đang hiển thị", count: tabCounts.active },
@@ -157,99 +289,98 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPo
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id as any)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   activeTab === tab.id
-                    ? 'border-teal-500 text-teal-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
                 }`}
               >
-                {tab.label}
-                <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
-                  {tab.count}
-                </span>
+                {tab.label} <span className="ml-1 text-xs">({tab.count})</span>
               </button>
             ))}
-          </nav>
+          </div>
         </div>
       </div>
 
       {/* Posts List */}
-      <div className="space-y-4">
+      <div className="divide-y divide-gray-100">
         {paginatedPosts.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="p-12 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-gray-400 text-2xl">📝</span>
+              <span className="text-gray-400 text-2xl">📄</span>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có bài đăng nào</h3>
-            <p className="text-gray-500">Bắt đầu tạo bài đăng đầu tiên của bạn</p>
+            <p className="text-gray-500">Bắt đầu đăng tin để quản lý phòng trọ của bạn</p>
           </div>
         ) : (
-          paginatedPosts.map((post) => (
-            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6">
-                <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Image */}
-                  <div className="lg:w-48 flex-shrink-0">
-                    <img
-                      src={post.images[0] || '/home/room1.png'}
-                      alt={post.title}
-                      className="w-full h-32 lg:h-full object-cover rounded-lg"
-                    />
-                  </div>
+          paginatedPosts.map((post, index) => (
+            <div key={post.id} className="p-6 hover:bg-gray-50 transition-colors">
+              <div className="flex items-start gap-4">
+                {/* Image */}
+                <div className="flex-shrink-0">
+                  <img
+                    src={post.images[0] || '/home/room1.png'}
+                    alt={post.title}
+                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                  />
+                </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                          {post.title}
-                        </h3>
-                        
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <div className="flex items-center gap-4">
-                            <span>📍 {post.address}</span>
-                            <span>📐 {post.area}m²</span>
-                            <span>💰 {formatPrice(post.price)}đ/tháng</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-4">
-                            <span>📂 Danh mục: {
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-1">
+                        {post.title}
+                      </h3>
+                      
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                        <span className="flex items-center gap-1">
+                          📍 {post.address}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          📐 {post.area}m²
+                        </span>
+                        <span className="flex items-center gap-1">
+                          💰 {formatPrice(post.price)}đ/tháng
+                        </span>
+                        <span className="flex items-center gap-1">
+                          🏷️ {post.category === 'roommate' ? 'Ở ghép' : 
                               post.category === 'phong-tro' ? 'Phòng trọ' :
-                              post.category === 'chung-cu' ? 'Chung cư' :
-                              'Nhà nguyên căn'
-                            }</span>
-                            <span>📅 Đăng ngày: {formatDate(post.createdAt)}</span>
-                            <span>👁️ {post.views} lượt xem</span>
-                          </div>
-                        </div>
+                              post.category === 'chung-cu' ? 'Chung cư' : 'Nhà nguyên căn'}
+                        </span>
                       </div>
 
-                      {/* Status & Actions */}
-                      <div className="flex flex-col items-end gap-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(post.status)}`}>
-                          {getStatusText(post.status)}
-                        </span>
-                        
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => onEdit(post.id)}
-                            className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            Chỉnh sửa
-                          </button>
-                          <button
-                            onClick={() => onView(post.id)}
-                            className="px-3 py-1 text-sm text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors"
-                          >
-                            Xem chi tiết
-                          </button>
-                          <button
-                            onClick={() => onDelete(post.id)}
-                            className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            Xóa
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <span>📅 Đăng ngày: {formatDate(post.createdAt)}</span>
+                        <span>👁️ {post.views} lượt xem</span>
+                      </div>
+                    </div>
+
+                    {/* Status & Actions */}
+                    <div className="flex-shrink-0 text-right">
+                      <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium mb-3 ${getStatusColor(post.status)}`}>
+                        {getStatusText(post.status)}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(post)}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          Chỉnh sửa
+                        </button>
+                        <button
+                          onClick={() => onView(post.id)}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Xem chi tiết
+                        </button>
+                        <button
+                          onClick={() => onDelete(post.id)}
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          Xóa
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -262,14 +393,25 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete }: MyPo
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          itemsPerPage={itemsPerPage}
-          totalItems={filteredPosts.length}
-        />
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            itemsPerPage={itemsPerPage}
+            totalItems={filteredPosts.length}
+          />
+        </div>
       )}
+      </div>
+
+      {/* Edit Post Modal */}
+      <EditPostModal
+        isOpen={editModalOpen}
+        onClose={handleCloseModal}
+        post={selectedPost}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

@@ -1,23 +1,35 @@
 "use client";
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { RentPostApi } from "../../types/RentPostApi";
+import { RoommatePost } from "../../services/roommatePosts";
+import { useFavorites } from "../../contexts/FavoritesContext";
 
-const images = [
-  "/home/room1.png",
-  "/home/room2.png", 
-  "/home/room3.png",
-  "/home/room4.png",
-  "/home/room1.png"
-];
+interface PropertyInfoProps {
+  postData: RentPostApi | RoommatePost | null;
+  postType: 'rent' | 'roommate';
+}
 
-export default function PropertyInfo() {
-  const [isFavorite, setIsFavorite] = useState(false);
+export default function PropertyInfo({ postData, postType }: PropertyInfoProps) {
   const [currentImage, setCurrentImage] = useState(0);
-  const searchParams = useSearchParams();
-  const propertyType = searchParams.get('type');
+  const { isFavorited, toggleFavorite } = useFavorites();
+  
+  // Extract images từ postData
+  const images = postData?.images && postData.images.length > 0 
+    ? postData.images 
+    : ["/home/room1.png"]; // fallback
 
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
+  // Get post ID và check favorite status
+  const postId = postType === 'rent' 
+    ? (postData as RentPostApi)?.rentPostId 
+    : (postData as any)?.roommatePostId || (postData as any)?.postId;
+  
+  
+  const isFav = postId ? isFavorited(postType, postId) : false;
+
+  const handleToggleFavorite = () => {
+    if (postId) {
+      toggleFavorite(postType, postId);
+    }
   };
 
   const nextImage = () => {
@@ -29,7 +41,6 @@ export default function PropertyInfo() {
   };
 
   const handleThumbnailClick = (index: number) => {
-    console.log('Clicking thumbnail:', index, 'Image:', images[index]);
     setCurrentImage(index);
   };
 
@@ -89,22 +100,23 @@ export default function PropertyInfo() {
 
       {/* Property Information Section */}
       <div className="flex justify-between items-start mb-4">
-                 <div className="flex-1">
-           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-             {propertyType === 'o-ghep' ? 'Phòng Trọ Mới Xây - Ở Ghép' : 'Phòng Tầng Trệt Có Nội Thất'}
-           </h1>
-           <p className="text-gray-600 mb-2">
-             Loại hình: {propertyType === 'o-ghep' ? 'Phòng trọ ở ghép' : 'Phòng trọ cho thuê'}
-           </p>
-         </div>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {postData?.title || 'Chưa có tiêu đề'}
+          </h1>
+          <p className="text-gray-600 mb-2">
+            Loại hình: {postType === 'roommate' ? 'Phòng trọ ở ghép' : 'Phòng trọ cho thuê'}
+          </p>
+        </div>
         
         <button
-          onClick={toggleFavorite}
+          onClick={handleToggleFavorite}
           className="ml-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          aria-label={isFav ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
         >
           <svg 
-            className={`w-8 h-8 ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-400'}`} 
-            fill="none" 
+            className={`w-8 h-8 transition-colors ${isFav ? 'text-red-500 fill-current' : 'text-gray-400 hover:text-red-400'}`} 
+            fill={isFav ? "currentColor" : "none"}
             stroke="currentColor" 
             viewBox="0 0 24 24"
           >
@@ -118,14 +130,24 @@ export default function PropertyInfo() {
         </button>
       </div>
 
-             <div className="flex items-center justify-between mb-4">
-         <div className="flex items-center gap-4">
-           <div className="text-2xl font-bold text-red-600">
-             {propertyType === 'o-ghep' ? '2,1 triệu / tháng' : '3,5 triệu / tháng'}
-           </div>
-           <div className="text-lg text-gray-600">
-             {propertyType === 'o-ghep' ? '25 m²' : '20 m²'}
-           </div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <div className="text-2xl font-bold text-red-600">
+            {postType === 'rent' && postData && 'basicInfo' in postData 
+              ? `${(postData.basicInfo.price / 1000000).toFixed(1)} triệu / tháng`
+              : postType === 'roommate' && postData && 'currentRoom' in postData
+              ? `${((postData as any).currentRoom.price / 1000000).toFixed(1)} triệu / tháng`
+              : 'Chưa có thông tin giá'
+            }
+          </div>
+          <div className="text-lg text-gray-600">
+            {postType === 'rent' && postData && 'basicInfo' in postData 
+              ? `${postData.basicInfo.area} m²`
+              : postType === 'roommate' && postData && 'currentRoom' in postData
+              ? `${(postData as any).currentRoom.area} m²`
+              : 'Chưa có thông tin diện tích'
+            }
+          </div>
          </div>
        </div>
 
@@ -134,14 +156,26 @@ export default function PropertyInfo() {
           <svg className="w-5 h-5 text-teal-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
           </svg>
-          <span>268 Đ. Tô Hiến Thành, Phường Diên Hồng, TP. Hồ Chí Minh</span>
+          <span>
+            {postType === 'rent' && postData && 'address' in postData 
+              ? `${postData.address.houseNumber || ''} ${postData.address.street}, ${postData.address.ward}, ${postData.address.district}, ${postData.address.city}`.trim()
+              : postType === 'roommate' && postData && 'currentRoom' in postData
+              ? (postData as any).currentRoom.address
+              : 'Chưa có thông tin địa chỉ'
+            }
+          </span>
         </div>
         
         <div className="flex items-center gap-2 text-gray-600">
           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span>Đăng 4 giờ trước</span>
+          <span>
+            Đăng {postData?.createdAt 
+              ? new Date(postData.createdAt).toLocaleDateString('vi-VN')
+              : 'chưa có thông tin'
+            }
+          </span>
         </div>
       </div>
     </div>
