@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Pagination from "../common/Pagination";
 import { RentPostApi } from "../../types/RentPostApi";
 import { RoommatePost } from "../../services/roommatePosts";
@@ -135,6 +135,7 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onRefr
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    try { sessionStorage.setItem('myposts_current_page', String(page)); } catch {}
     setTimeout(scrollToTop, 80);
   };
 
@@ -185,6 +186,23 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onRefr
       default: return status;
     }
   };
+
+  // Restore current page from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const saved = Number(sessionStorage.getItem('myposts_current_page') || '1');
+      if (saved && saved > 0) setCurrentPage(saved);
+    } catch {}
+  }, []);
+
+  // Clamp currentPage when filtered list size changes
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      const newPage = totalPages;
+      setCurrentPage(newPage);
+      try { sessionStorage.setItem('myposts_current_page', String(newPage)); } catch {}
+    }
+  }, [totalPages]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN').format(price);

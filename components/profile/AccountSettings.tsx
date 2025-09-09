@@ -24,7 +24,7 @@ export default function AccountSettings({ isVerified = false, onVerificationComp
         const status = await getMyVerificationStatus();
         setVerificationStatus(status);
       } catch (error) {
-        console.error('Failed to load verification status:', error);
+        // Failed to load verification status
       }
     };
 
@@ -32,7 +32,7 @@ export default function AccountSettings({ isVerified = false, onVerificationComp
   }, []);
 
   const handleVerificationComplete = (data: VerificationData) => {
-    console.log('Verification data:', data);
+    // Debug: verification data
     onVerificationComplete?.(data);
     setIsVerificationModalOpen(false);
     
@@ -42,7 +42,7 @@ export default function AccountSettings({ isVerified = false, onVerificationComp
         const status = await getMyVerificationStatus();
         setVerificationStatus(status);
       } catch (error) {
-        console.error('Failed to reload verification status:', error);
+        // Failed to reload verification status
       }
     };
     loadVerificationStatus();

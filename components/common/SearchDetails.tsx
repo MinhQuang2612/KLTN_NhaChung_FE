@@ -50,7 +50,7 @@ export default function SearchDetails() {
       });
     }
     
-    console.log("search:", q, selected, activeFilters);
+    // Trigger search action
   };
 
   const clearFilters = () => {

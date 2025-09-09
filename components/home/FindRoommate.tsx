@@ -47,7 +47,6 @@ const mockPosts = [
             setPosts(transformedPosts);
           }
         } catch (error) {
-          console.error('Failed to load roommate posts:', error);
           // Keep mock data as fallback
         } finally {
           setLoading(false);

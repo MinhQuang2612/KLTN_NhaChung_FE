@@ -19,6 +19,11 @@ type Props = {
   guideTitle?: string; // tiêu đề modal
   guideItems?: string[]; // bullet modal
   className?: string;
+  // Mở rộng: hiển thị phần nội dung bổ sung trên cùng khung (ví dụ ảnh hiện có)
+  extraTop?: React.ReactNode;
+  // Ảnh bìa: cho phép đặt bìa cho item local
+  coverLocalId?: string;
+  onSetCoverLocal?: (localId: string) => void;
 };
 
 export default function MediaPickerPanel({
@@ -31,6 +36,9 @@ export default function MediaPickerPanel({
   guideTitle,
   guideItems,
   className = "",
+  extraTop,
+  coverLocalId,
+  onSetCoverLocal,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -127,6 +135,8 @@ export default function MediaPickerPanel({
         onDrop={onDrop}
         className="relative rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50/40 p-4"
       >
+        {/* Nội dung bổ sung đặt bên trên (ví dụ: grid ảnh đã có) */}
+        {extraTop}
         {/* Pill mở modal hướng dẫn */}
         {(guideTitle || pillText) && (
           <button
@@ -207,7 +217,7 @@ export default function MediaPickerPanel({
                   </div>
 
                   {/* Tag bìa */}
-                  {idx === 0 && (
+                  {coverLocalId === it.id && (
                     <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[11px] px-1.5 py-0.5 rounded">
                       Ảnh bìa
                     </span>
@@ -222,6 +232,18 @@ export default function MediaPickerPanel({
                   >
                     ×
                   </button>
+
+                  {/* Nút đặt làm bìa */}
+                  {onSetCoverLocal && coverLocalId !== it.id && (
+                    <button
+                      type="button"
+                      onClick={() => onSetCoverLocal(it.id)}
+                      className="absolute bottom-1 right-1 h-6 px-2 rounded-full bg-black/70 text-white text-[11px]"
+                      title="Đặt làm ảnh bìa"
+                    >
+                      Đặt làm bìa
+                    </button>
+                  )}
                 </div>
               ))}
 

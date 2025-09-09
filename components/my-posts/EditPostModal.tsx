@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { updateRentPost } from "../../services/rentPosts";
+import { updateRoommatePost } from "../../services/roommatePosts";
+import { uploadFiles } from "../../utils/upload";
+import type { Category } from "../../types/RentPostApi";
+import type { LocalMediaItem } from "../common/MediaPickerLocal";
+import EditFormRenderer from "./EditFormRenderer";
 
 interface EditPostModalProps {
   isOpen: boolean;
@@ -11,29 +16,150 @@ interface EditPostModalProps {
 }
 
 export default function EditPostModal({ isOpen, onClose, post, onSuccess }: EditPostModalProps) {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    basicInfo: {
-      area: 0,
-      price: 0,
-      deposit: 0,
-      furniture: '',
-      bedrooms: 0,
-      bathrooms: 0,
-      direction: '',
-    }
-  });
+  const [formData, setFormData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean } | null>(null);
 
   // Initialize form data when post changes
   useEffect(() => {
     if (post) {
-      setFormData({
+      const category = post.category as Category;
+      
+      // Xác định roommate: nếu không phải 3 loại rent thì là roommate
+      const rentCategories = ['phong-tro', 'chung-cu', 'nha-nguyen-can'];
+      const isRoommatePost = !rentCategories.includes(String(category || '').toLowerCase());
+      
+      // Common fields
+      let data: any = {
         title: post.title || '',
         description: post.description || '',
-        basicInfo: {
+        category: category
+      };
+
+      // Initialize based on category or detected type
+      if (isRoommatePost) {
+        // Roommate posts have different structure - match RoommateForm fields
+        data = {
+          ...data,
+          images: [], // file uploads mới (MediaPickerLocal chỉ nhận LocalMediaItem)
+          coverImageUrl: Array.isArray(post.images) && post.images.length ? post.images[0] : '',
+          existingImages: Array.isArray(post.images) ? post.images : [],
+          // Personal info
+          age: post.personalInfo?.age || 0,
+          gender: (() => {
+            const g = (post.personalInfo?.gender || '').toLowerCase();
+            if (g === 'male') return 'Nam';
+            if (g === 'female') return 'Nữ';
+            if (g) return 'Khác';
+            return '';
+          })(),
+          occupation: post.personalInfo?.occupation || '',
+          selectedHobbies: post.personalInfo?.hobbies || [],
+          livingHabits: (post.personalInfo?.habits && post.personalInfo.habits[0]) || '',
+
+          // Current room info
+          currentAddress: post.currentRoom?.address || '',
+          area: post.currentRoom?.area || 0,
+          roomDescription: post.currentRoom?.description || '',
+          // Budget/price mapping (ưu tiên requirements.maxPrice nếu có)
+          budget: post.requirements?.maxPrice || post.currentRoom?.price || 0,
+
+          // Requirements
+          preferredGender: (() => {
+            const g = (post.requirements?.gender || '').toLowerCase();
+            if (g === 'male') return 'Nam';
+            if (g === 'female') return 'Nữ';
+            if (g === 'any') return 'Không quan trọng';
+            return '';
+          })(),
+          preferredAge: post.requirements?.ageRange ? `${post.requirements.ageRange[0]}-${post.requirements.ageRange[1]}` : '',
+          selectedTraits: post.requirements?.traits || [],
+
+          // Các trường không có trong API roommate sẽ để trống (giữ tương thích UI)
+          fullName: post.fullName || '',
+          roomType: post.roomType || '',
+          currentOccupants: post.currentOccupants || '',
+          duration: post.duration || '',
+          cleanliness: post.cleanliness || '',
+          phoneNumber: post.phoneNumber || '',
+          email: post.email || ''
+        };
+      } else {
+        switch (category) {
+        case 'phong-tro':
+          data = {
+            ...data,
+            furniture: post.basicInfo?.furniture || '',
+            area: post.basicInfo?.area || 0,
+            price: post.basicInfo?.price || 0,
+            deposit: post.basicInfo?.deposit || 0,
+            address: post.address || null,
+            existingImages: Array.isArray(post.images) ? post.images : [],
+            coverImageUrl: Array.isArray(post.images) && post.images.length ? post.images[0] : '',
+            images: [], // Will be populated from existing images
+            existingVideos: Array.isArray(post.videos) ? post.videos : [],
+            videos: []  // Will be populated from existing videos
+          };
+          break;
+
+        case 'chung-cu':
+          data = {
+            ...data,
+            buildingName: post.chungCuInfo?.buildingName || '',
+            blockOrTower: post.chungCuInfo?.blockOrTower || '',
+            floorNumber: post.chungCuInfo?.floorNumber || 0,
+            unitCode: post.chungCuInfo?.unitCode || '',
+            propertyType: post.chungCuInfo?.propertyType || '',
+            bedrooms: post.basicInfo?.bedrooms || 0,
+            bathrooms: post.basicInfo?.bathrooms || 0,
+            direction: post.basicInfo?.direction || '',
+            furniture: post.basicInfo?.furniture || '',
+            legalStatus: post.chungCuInfo?.legalStatus || '',
+            area: post.basicInfo?.area || 0,
+            price: post.basicInfo?.price || 0,
+            deposit: post.basicInfo?.deposit || 0,
+            address: post.address || null,
+            existingImages: Array.isArray(post.images) ? post.images : [],
+            coverImageUrl: Array.isArray(post.images) && post.images.length ? post.images[0] : '',
+            images: [], // Will be populated from existing images
+            existingVideos: Array.isArray(post.videos) ? post.videos : [],
+            videos: []  // Will be populated from existing videos
+          };
+          break;
+
+        case 'nha-nguyen-can':
+          data = {
+            ...data,
+            khuLo: post.nhaNguyenCanInfo?.khuLo || '',
+            unitCode: post.nhaNguyenCanInfo?.unitCode || '',
+            propertyType: post.nhaNguyenCanInfo?.propertyType || '',
+            bedrooms: post.basicInfo?.bedrooms || 0,
+            bathrooms: post.basicInfo?.bathrooms || 0,
+            direction: post.basicInfo?.direction || '',
+            totalFloors: post.nhaNguyenCanInfo?.totalFloors || 0,
+            furniture: post.basicInfo?.furniture || '',
+            legalStatus: post.nhaNguyenCanInfo?.legalStatus || '',
+            landArea: post.nhaNguyenCanInfo?.landArea || 0,
+            usableArea: post.nhaNguyenCanInfo?.usableArea || 0,
+            width: post.nhaNguyenCanInfo?.width || 0,
+            length: post.nhaNguyenCanInfo?.length || 0,
+            price: post.basicInfo?.price || 0,
+            deposit: post.basicInfo?.deposit || 0,
+            features: post.nhaNguyenCanInfo?.features || [],
+            address: post.address || null,
+            existingImages: Array.isArray(post.images) ? post.images : [],
+            coverImageUrl: Array.isArray(post.images) && post.images.length ? post.images[0] : '',
+            images: [], // Will be populated from existing images
+            existingVideos: Array.isArray(post.videos) ? post.videos : [],
+            videos: []  // Will be populated from existing videos
+          };
+          break;
+
+        default:
+          // Fallback to basic info
+          data = {
+            ...data,
           area: post.basicInfo?.area || 0,
           price: post.basicInfo?.price || 0,
           deposit: post.basicInfo?.deposit || 0,
@@ -41,51 +167,325 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
           bedrooms: post.basicInfo?.bedrooms || 0,
           bathrooms: post.basicInfo?.bathrooms || 0,
           direction: post.basicInfo?.direction || '',
+            address: post.address || null
+          };
         }
-      });
+      }
+
+      setFormData(data);
     }
   }, [post]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!post?.rentPostId) return;
+    const category = post?.category as Category;
+    
+    // Determine roommate by category list
+    const rentCategoriesCheck = ['phong-tro', 'chung-cu', 'nha-nguyen-can'];
+    const isRoommateByCat = !rentCategoriesCheck.includes(String(category || '').toLowerCase());
+
+    // Validate required IDs (show error instead of silent return)
+    if (isRoommateByCat) {
+      if (!post?.roommatePostId && !post?.postId) {
+        setError('Không tìm thấy ID bài roommate để cập nhật.');
+        return;
+      }
+    } else {
+      if (!post?.rentPostId) {
+        setError('Không tìm thấy ID bài thuê để cập nhật.');
+        return;
+      }
+    }
 
     try {
       setLoading(true);
       setError(null);
 
-      await updateRentPost(post.rentPostId, formData);
-      
-      onSuccess();
-      onClose();
+      // Xác định roommate: nếu không phải 3 loại rent thì là roommate
+      const rentCategories = ['phong-tro', 'chung-cu', 'nha-nguyen-can'];
+      const isRoommatePost = !rentCategories.includes(String(category || '').toLowerCase());
+
+      // Construct payload based on category
+      let payload: any = {
+        title: formData.title,
+        description: formData.description
+      };
+
+      // Handle roommate posts separately
+      if (isRoommatePost) {
+        // Upload images for roommate
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const userId = user?.userId;
+
+        if (!userId) {
+          throw new Error('Không tìm thấy thông tin người dùng');
+        }
+
+        let imageUrls: string[] = [];
+        if (formData.images && formData.images.length > 0) {
+          const imageFiles = formData.images.map((item: LocalMediaItem) => item.file);
+          imageUrls = await uploadFiles(imageFiles, userId, 'images');
+        }
+
+        // Partial update per API guide: send only fields with values
+        const rmPayload: any = {};
+        if (formData.title && formData.title.trim()) rmPayload.title = formData.title.trim();
+        if (formData.description && formData.description.trim()) rmPayload.description = formData.description.trim();
+        if (imageUrls.length) rmPayload.images = imageUrls;
+
+        // Map personalInfo only if has required fields
+        const mapGender = (val: string): 'male' | 'female' | 'other' | undefined => {
+          const g = (val || '').toLowerCase();
+          if (g.includes('nam')) return 'male';
+          if (g.includes('nữ') || g.includes('nu')) return 'female';
+          if (g) return 'other';
+          return undefined;
+        };
+        const ageNum = Number(formData.age);
+        const genderApi = mapGender(formData.gender || '');
+        if (ageNum && ageNum >= 18 && ageNum <= 100 && genderApi) {
+          rmPayload.personalInfo = {
+            age: ageNum,
+            gender: genderApi,
+            ...(formData.occupation ? { occupation: String(formData.occupation) } : {}),
+            ...(Array.isArray(formData.selectedHobbies) && formData.selectedHobbies.length
+              ? { hobbies: formData.selectedHobbies }
+              : {}),
+            ...(formData.livingHabits
+              ? { habits: [String(formData.livingHabits)] }
+              : {}),
+          };
+        }
+
+        // Map requirements if parseable
+        const mapReqGender = (val: string): 'male' | 'female' | 'any' | undefined => {
+          const g = (val || '').toLowerCase();
+          if (g.includes('không') || g.includes('any')) return 'any';
+          if (g.includes('nam')) return 'male';
+          if (g.includes('nữ') || g.includes('nu')) return 'female';
+          return undefined;
+        };
+        let ageRange: [number, number] | undefined;
+        if (formData.preferredAge && typeof formData.preferredAge === 'string') {
+          const m = formData.preferredAge.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})/);
+          if (m) {
+            const min = Number(m[1]);
+            const max = Number(m[2]);
+            if (min && max && min < max) {
+              ageRange = [min, max];
+            }
+          }
+        }
+        const reqGender = mapReqGender(formData.preferredGender || '');
+        const maxPrice = formData.budget ? Number(String(formData.budget).replace(/\D+/g, '')) : undefined;
+        const traits = Array.isArray(formData.selectedTraits) ? formData.selectedTraits : [];
+        const requirements: any = {};
+        if (ageRange) requirements.ageRange = ageRange;
+        if (reqGender) requirements.gender = reqGender;
+        if (traits.length) requirements.traits = traits;
+        if (typeof maxPrice === 'number' && !Number.isNaN(maxPrice) && maxPrice > 0) requirements.maxPrice = maxPrice;
+        if (Object.keys(requirements).length) {
+          rmPayload.requirements = requirements;
+        }
+        if (!Object.keys(rmPayload).length) {
+          setError('Vui lòng thay đổi ít nhất 1 trường (tiêu đề/mô tả/ảnh hoặc thông tin khác)');
+          setLoading(false);
+          return;
+        }
+        payload = rmPayload;
+      } else {
+        // Handle file uploads for rent posts
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const userId = user?.userId;
+
+        if (!userId) {
+          throw new Error('Không tìm thấy thông tin người dùng');
+        }
+
+        // Upload new images if any
+        let imageUrls: string[] = [];
+        if (formData.images && formData.images.length > 0) {
+          const imageFiles = formData.images.map((item: LocalMediaItem) => item.file);
+          imageUrls = await uploadFiles(imageFiles, userId, 'images');
+        }
+
+        // Upload new videos if any
+        let videoUrls: string[] = [];
+        if (formData.videos && formData.videos.length > 0) {
+          const videoFiles = formData.videos.map((item: LocalMediaItem) => item.file);
+          videoUrls = await uploadFiles(videoFiles, userId, 'videos');
+        }
+        switch (category) {
+        case 'phong-tro':
+          payload = {
+            ...payload,
+            basicInfo: {
+              area: formData.area,
+              price: formData.price,
+              deposit: formData.deposit,
+              furniture: formData.furniture
+            },
+            address: formData.address,
+            images: imageUrls,
+            videos: videoUrls
+          };
+          break;
+
+        case 'chung-cu':
+          payload = {
+            ...payload,
+            basicInfo: {
+              area: formData.area,
+              price: formData.price,
+              deposit: formData.deposit,
+              furniture: formData.furniture,
+              bedrooms: formData.bedrooms,
+              bathrooms: formData.bathrooms,
+              direction: formData.direction
+            },
+            chungCuInfo: {
+              buildingName: formData.buildingName,
+              blockOrTower: formData.blockOrTower,
+              floorNumber: formData.floorNumber,
+              unitCode: formData.unitCode,
+              propertyType: formData.propertyType,
+              legalStatus: formData.legalStatus
+            },
+            address: formData.address,
+            images: imageUrls,
+            videos: videoUrls
+          };
+          break;
+
+        case 'nha-nguyen-can':
+          payload = {
+            ...payload,
+            basicInfo: {
+              area: (formData.area || formData.usableArea || formData.landArea || 0),
+              price: formData.price,
+              deposit: formData.deposit,
+              furniture: formData.furniture,
+              bedrooms: formData.bedrooms,
+              bathrooms: formData.bathrooms,
+              direction: formData.direction
+            },
+            nhaNguyenCanInfo: {
+              khuLo: formData.khuLo,
+              unitCode: formData.unitCode,
+              propertyType: formData.propertyType,
+              totalFloors: formData.totalFloors,
+              legalStatus: formData.legalStatus,
+              landArea: formData.landArea,
+              usableArea: formData.usableArea,
+              width: formData.width,
+              length: formData.length,
+              features: formData.features
+            },
+            address: formData.address,
+            images: imageUrls,
+            videos: videoUrls
+          };
+          break;
+
+        default:
+          // Fallback
+          payload = {
+            ...payload,
+            basicInfo: {
+              area: formData.area || 0,
+              price: formData.price || 0,
+              deposit: formData.deposit || 0,
+              furniture: formData.furniture || '',
+              bedrooms: formData.bedrooms || 0,
+              bathrooms: formData.bathrooms || 0,
+              direction: formData.direction || ''
+            },
+            address: formData.address,
+            images: imageUrls,
+            videos: videoUrls
+          };
+        }
+      }
+
+      // Tạo danh sách ảnh cuối cùng (giữ ảnh cũ còn lại + ảnh mới), ưu tiên ảnh bìa đứng đầu
+      const buildFinalImages = (uploaded: string[]) => {
+        const existing: string[] = Array.isArray(formData.existingImages) ? formData.existingImages : [];
+        // cover từ ảnh cũ (url) hoặc từ ảnh mới (local id)
+        let cover: string | undefined = formData.coverImageUrl;
+        // Nếu người dùng chọn bìa từ ảnh mới (coverLocalId), khi đã upload ta ưu tiên ảnh mới đầu tiên làm bìa
+        if (!cover && formData.coverLocalId && uploaded.length) {
+          cover = uploaded[0];
+        }
+        let final = [...(existing || []), ...(uploaded || [])];
+        if (cover && final.includes(cover)) {
+          final = [cover, ...final.filter((u) => u !== cover)];
+        }
+        return final.slice(0, 12);
+      };
+
+      // Use appropriate API based on category
+      if (isRoommatePost) {
+        const roommateId = post.roommatePostId || post.postId;
+        // merge images cũ + mới
+        if (payload.images) {
+          payload.images = buildFinalImages(payload.images);
+        } else if (formData.existingImages) {
+          payload.images = buildFinalImages([]);
+        }
+        await updateRoommatePost(Number(roommateId), payload);
+      } else {
+        // Use rent post API for other categories
+        if (payload.images) {
+          payload.images = buildFinalImages(payload.images);
+        } else if (formData.existingImages) {
+          payload.images = buildFinalImages([]);
+        }
+        await updateRentPost(post.rentPostId, payload);
+      }
+      setToast({ message: 'Cập nhật bài đăng thành công!', type: 'success', visible: true });
+      // Auto hide toast
+      setTimeout(() => setToast((t) => (t ? { ...t, visible: false } : t)), 2200);
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 900);
     } catch (err: any) {
-      console.error('Failed to update post:', err);
       setError('Không thể cập nhật bài đăng. Vui lòng thử lại.');
+      setToast({ message: 'Cập nhật thất bại. Vui lòng thử lại.', type: 'error', visible: true });
+      setTimeout(() => setToast((t) => (t ? { ...t, visible: false } : t)), 2200);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    
-    if (name.startsWith('basicInfo.')) {
-      const field = name.split('.')[1];
-      setFormData(prev => ({
-        ...prev,
-        basicInfo: {
-          ...prev.basicInfo,
-          [field]: field === 'area' || field === 'price' || field === 'deposit' || field === 'bedrooms' || field === 'bathrooms' 
-            ? parseInt(value) || 0 
-            : value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
+  const handleInputChange = (name: string, value: any) => {
+    setFormData((prev: any) => ({
         ...prev,
         [name]: value
       }));
-    }
+  };
+
+  const handleNumberChange = (name: string, value: string) => {
+    const numValue = value === "" ? 0 : parseFloat(value) || 0;
+    handleInputChange(name, numValue);
+  };
+
+  // Render form based on category
+  const renderFormContent = () => {
+    if (!post) return null;
+    
+    const category = post.category as Category;
+
+    return (
+      <EditFormRenderer
+        category={category}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onNumberChange={handleNumberChange}
+      />
+    );
   };
 
   if (!isOpen) return null;
@@ -99,6 +499,34 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
     className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
     onClick={(e) => e.stopPropagation()}
   >
+        {/* Toast */}
+        {toast && (
+          <div className={`fixed right-6 top-6 z-[60] transform transition-all duration-300 ${toast.visible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}`}>
+            <div className={`pointer-events-auto flex items-start gap-3 rounded-xl border backdrop-blur bg-white/90 shadow-lg ring-1 ring-black/10 px-4 py-3 min-w-[280px]`}
+            >
+              <div className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${toast.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-rose-100 text-rose-600'}`}>
+                {toast.type === 'success' ? (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                )}
+              </div>
+              <div className="flex-1 text-sm text-gray-800">
+                {toast.message}
+              </div>
+              <button
+                aria-label="Đóng"
+                onClick={() => setToast((t) => (t ? { ...t, visible: false } : t))}
+                className="ml-2 rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className={`h-1 mt-2 rounded-full ${toast.type === 'success' ? 'bg-green-200' : 'bg-rose-200'}`}>
+              <div className={`${toast.type === 'success' ? 'bg-green-600' : 'bg-rose-600'} h-1 rounded-full animate-[shrink_2.2s_linear_forwards]`}/>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Chỉnh sửa bài đăng</h2>
@@ -120,152 +548,8 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
             </div>
           )}
 
-          {/* Basic Info */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900">Thông tin cơ bản</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tiêu đề <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                placeholder="Nhập tiêu đề bài đăng"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mô tả
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                placeholder="Mô tả chi tiết về phòng trọ"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Diện tích (m²) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="basicInfo.area"
-                  value={formData.basicInfo.area}
-                  onChange={handleInputChange}
-                  required
-                  min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Giá thuê (VNĐ/tháng) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="basicInfo.price"
-                  value={formData.basicInfo.price}
-                  onChange={handleInputChange}
-                  required
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tiền cọc (VNĐ)
-                </label>
-                <input
-                  type="number"
-                  name="basicInfo.deposit"
-                  value={formData.basicInfo.deposit}
-                  onChange={handleInputChange}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nội thất
-                </label>
-                <select
-                  name="basicInfo.furniture"
-                  value={formData.basicInfo.furniture}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                >
-                  <option value="">Chọn tình trạng nội thất</option>
-                  <option value="trong">Trống</option>
-                  <option value="co-ban">Cơ bản</option>
-                  <option value="full">Đầy đủ</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số phòng ngủ
-                </label>
-                <input
-                  type="number"
-                  name="basicInfo.bedrooms"
-                  value={formData.basicInfo.bedrooms}
-                  onChange={handleInputChange}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số phòng tắm
-                </label>
-                <input
-                  type="number"
-                  name="basicInfo.bathrooms"
-                  value={formData.basicInfo.bathrooms}
-                  onChange={handleInputChange}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Hướng nhà
-                </label>
-                <select
-                  name="basicInfo.direction"
-                  value={formData.basicInfo.direction}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                >
-                  <option value="">Chọn hướng nhà</option>
-                  <option value="dong">Đông</option>
-                  <option value="tay">Tây</option>
-                  <option value="nam">Nam</option>
-                  <option value="bac">Bắc</option>
-                  <option value="dong-nam">Đông Nam</option>
-                  <option value="dong-bac">Đông Bắc</option>
-                  <option value="tay-nam">Tây Nam</option>
-                  <option value="tay-bac">Tây Bắc</option>
-                </select>
-              </div>
-            </div>
-          </div>
+          {/* Dynamic Form Content Based on Category */}
+          {renderFormContent()}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">

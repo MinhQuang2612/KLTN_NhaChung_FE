@@ -111,7 +111,6 @@ export default function Suggestions() {
         
         setItems(transformedCards);
       } catch (error) {
-        console.error('Failed to load mixed posts:', error);
         setItems([]);
       } finally {
         setLoading(false);

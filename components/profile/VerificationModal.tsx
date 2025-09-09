@@ -52,7 +52,7 @@ const processOCRWithFPT = async (frontImage: string, backImage: string) => {
     return extractDataFromFPTResponse(frontData, backData);
     
   } catch (error) {
-    console.error('OCR processing failed:', error);
+    // OCR processing failed
     throw error; // Re-throw error instead of using mock data
   }
 };
@@ -80,8 +80,7 @@ const base64ToBlob = async (base64: string): Promise<Blob> => {
 
 // Extract data from FPT.AI response
 const extractDataFromFPTResponse = (frontData: any, backData: any) => {
-  console.log('Front data:', frontData);
-  console.log('Back data:', backData);
+  // Preview OCR data in UI if needed
   
   // FPT.AI response structure based on the API documentation
   const frontInfo = frontData.data?.[0] || {};
@@ -129,15 +128,15 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back') => {
     const file = e.target.files?.[0];
-    console.log('Uploading file for type:', type, 'File:', file?.name);
+    // Uploading file
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       if (type === 'front') {
         setFrontImage(imageUrl);
-        console.log('Set front image:', imageUrl);
+        // Set front image
       } else {
         setBackImage(imageUrl);
-        console.log('Set back image:', imageUrl);
+        // Set back image
       }
     }
   };
@@ -156,7 +155,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
       try {
         // Gọi API thật từ Backend
         const response = await submitVerification(formData as VerificationData);
-        console.log('Verification submitted successfully:', response);
+        // Success
         
         // Thông báo cho parent component
         onVerify(formData as VerificationData);
@@ -171,7 +170,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
         }, 2000);
         
       } catch (error: any) {
-        console.error('Verification submission failed:', error);
+        // Failed to submit verification
         alert('❌ Gửi yêu cầu xác thực thất bại: ' + (error.message || 'Vui lòng thử lại'));
       }
     } else {
@@ -351,7 +350,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
                         }));
                         setStep('review');
                       } catch (error) {
-                        console.error('OCR processing failed:', error);
+                        // OCR processing failed
                         // Show error message to user
                         alert('Không thể xử lý ảnh CCCD/CMND. Vui lòng thử lại hoặc kiểm tra kết nối mạng.');
                       } finally {

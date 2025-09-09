@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/utils/api";
+import { apiGet, apiPost, apiPut } from "@/utils/api";
 
 // Types cho Roommate Posts
 export interface RoommatePost {
@@ -56,4 +56,11 @@ export async function getRoommatePostById(id: number) {
  */
 export async function createRoommatePost(data: Partial<RoommatePost>) {
   return apiPost<RoommatePost>('roommate-posts', data);
+}
+
+/**
+ * Update roommate post
+ */
+export async function updateRoommatePost(id: number, data: Partial<RoommatePost>) {
+  return apiPut<RoommatePost>(`roommate-posts/${id}`, data);
 }

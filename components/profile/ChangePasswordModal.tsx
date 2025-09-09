@@ -95,7 +95,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
       onClose();
       
     } catch (error: any) {
-      console.error('Error changing password:', error);
+      // Error changing password
       
       // Handle specific error cases
       if (error.status === 401) {

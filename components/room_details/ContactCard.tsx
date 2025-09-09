@@ -58,7 +58,6 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
         });
 
       } catch (error) {
-        console.error('Failed to fetch user info:', error);
         setUserStats({ postsCount: 0, joinedDate: null });
       } finally {
         setLoading(false);

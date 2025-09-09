@@ -37,7 +37,7 @@ export default function HeroSection() {
       });
     }
     
-    console.log("search:", q, selected);
+    // Trigger search
   };
 
   const clearFilters = () => {

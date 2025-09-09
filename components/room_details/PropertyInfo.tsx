@@ -54,8 +54,8 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
             src={images[currentImage]}
             alt="Phòng trọ"
             className="w-full h-96 object-cover rounded-lg"
-            onLoad={() => console.log('Main image loaded:', images[currentImage])}
-            onError={(e) => console.log('Main image error:', images[currentImage], e)}
+            onLoad={() => {}}
+            onError={() => {}}
           />
           
           {/* Navigation Arrows */}
