@@ -119,6 +119,23 @@ class AddressService {
     return parts.join(', ');
   }
 
+  // Helper to format short address: ward + city only
+  formatWardCity(address?: Partial<Address> | null): string {
+    if (!address) return '';
+    const wardName = address.ward || address.wardName || '';
+    let cityName = address.city || address.provinceName || '';
+    if (cityName.includes('Thành phố Hồ Chí Minh')) {
+      cityName = 'TP.HCM';
+    } else if (cityName.includes('Thành phố Hà Nội')) {
+      cityName = 'Hà Nội';
+    } else if (cityName.includes('Thành phố')) {
+      cityName = cityName.replace('Thành phố ', 'TP.');
+    } else if (cityName.includes('Tỉnh')) {
+      cityName = cityName.replace('Tỉnh ', '');
+    }
+    return [wardName, cityName].filter(Boolean).join(', ');
+  }
+
 }
 
 export const addressService = new AddressService();

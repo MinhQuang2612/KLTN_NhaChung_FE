@@ -1,4 +1,6 @@
 import { RentPostApi } from "./RentPostApi";
+import type { Address } from "./RentPost";
+import { addressService } from "../services/address";
 import { RoommatePost } from "../services/roommatePosts";
 
 // Unified type cho hiển thị cả rent posts và roommate posts
@@ -10,7 +12,8 @@ export interface UnifiedPost {
   images: string[];
   price: number;
   area: number;
-  location: string; // city
+  location: string; // short display: ward + city
+  address?: Address; // full address object for components cần chi tiết
   category?: string; // chỉ có cho rent posts
   photoCount: number;
   bedrooms?: number;
@@ -32,7 +35,8 @@ export function rentPostToUnified(post: RentPostApi): UnifiedPost {
     images: post.images || ["/home/room1.png"],
     price: post.basicInfo.price,
     area: post.basicInfo.area,
-    location: post.address.city,
+    location: addressService.formatWardCity(post.address),
+    address: post.address,
     category: post.category,
     photoCount: (post.images?.length || 0) + (post.videos?.length || 0),
     bedrooms: post.basicInfo.bedrooms,
@@ -52,9 +56,8 @@ export function roommatePostToUnified(post: RoommatePost): UnifiedPost {
     images: post.images || ["/home/room1.png"],
     price: post.currentRoom.price,
     area: post.currentRoom.area,
-    location: typeof post.currentRoom.address === 'string' 
-      ? post.currentRoom.address 
-      : `${post.currentRoom.address.specificAddress ? post.currentRoom.address.specificAddress + ', ' : ''}${post.currentRoom.address.street}, ${post.currentRoom.address.ward}, ${post.currentRoom.address.city}`.replace(/^,\s*/, ''),
+    location: addressService.formatWardCity(post.currentRoom.address),
+    address: post.currentRoom.address,
     category: 'roommate',
     photoCount: post.images?.length || 0,
     isVerified: false, // Roommate posts không có verification

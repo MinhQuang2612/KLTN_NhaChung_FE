@@ -149,16 +149,27 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
   };
 
   const handleSubmit = async () => {
-    if (formData.idNumber && formData.fullName && formData.dateOfBirth && 
-        formData.issueDate && formData.issuePlace && formData.gender) {
+    // Chuẩn hóa dữ liệu và gán giá trị mặc định cho nơi cấp nếu chưa nhập
+    const normalized: VerificationData | null = (() => {
+      const idNumber = (formData.idNumber || '').trim();
+      const fullName = (formData.fullName || '').trim();
+      const dateOfBirth = (formData.dateOfBirth || '').trim();
+      const issueDate = (formData.issueDate || '').trim();
+      const issuePlace = (formData.issuePlace || 'Cục cảnh sát quản lý hành chính về trật tự xã hội').trim();
+      const gender = formData.gender as 'male' | 'female' | undefined;
+      if (!idNumber || !fullName || !dateOfBirth || !issueDate || !issuePlace || !gender) return null;
+      return { idNumber, fullName, dateOfBirth, issueDate, issuePlace, gender };
+    })();
+
+    if (normalized) {
       
       try {
         // Gọi API thật từ Backend
-        const response = await submitVerification(formData as VerificationData);
+        const response = await submitVerification(normalized as VerificationData);
         // Success
         
         // Thông báo cho parent component
-        onVerify(formData as VerificationData);
+        onVerify(normalized as VerificationData);
         
         setStep('success');
         setTimeout(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { addressService } from "../../services/address";
 import Pagination from "../common/Pagination";
 
 interface Favorite {
@@ -162,8 +163,8 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
             <p className="text-gray-500">Bắt đầu lưu các phòng trọ bạn quan tâm</p>
           </div>
         ) : (
-          paginatedFavorites.map((favorite) => (
-            <div key={favorite.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+          paginatedFavorites.map((favorite, index) => (
+            <div key={`${favorite.postType || 'rent'}-${favorite.id}-${index}`} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
               {/* Image */}
               <div className="relative">
                 <img
@@ -187,9 +188,11 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
                 
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
                   <div className="flex items-center gap-2">
-                    <span>📍 {typeof favorite.address === 'string' 
-                      ? favorite.address 
-                      : `${favorite.address.specificAddress ? favorite.address.specificAddress + ', ' : ''}${favorite.address.street}, ${favorite.address.ward}, ${favorite.address.city}`.replace(/^,\s*/, '')}</span>
+                    <span>
+                      📍 {typeof favorite.address === 'string'
+                        ? favorite.address
+                        : addressService.formatWardCity(favorite.address)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-4">
                     <span>📐 {favorite.area}m²</span>

@@ -48,51 +48,63 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
     <div className="bg-white rounded-lg shadow-md p-6">
       {/* Image Gallery Section */}
       <div className="space-y-4 mb-6">
-        {/* Main Image */}
-        <div className="relative">
-          <img
-            src={images[currentImage]}
-            alt="Phòng trọ"
-            className="w-full h-96 object-cover rounded-lg"
-            onLoad={() => {}}
-            onError={() => {}}
+        {/* Main Image (object-contain, nền mờ, điều hướng, đếm trang) */}
+        <div className="relative bg-gray-100 rounded-xl overflow-hidden">
+          <div className="w-full h-[420px] md:h-[500px] flex items-center justify-center">
+            <img
+              src={images[currentImage]}
+              alt="Phòng trọ"
+              className="max-h-full max-w-full object-contain"
+              loading="lazy"
+            />
+          </div>
+          <div
+            className="pointer-events-none absolute inset-0 -z-10 bg-center bg-cover scale-110 blur-md opacity-40"
+            style={{ backgroundImage: `url(${images[currentImage]})` }}
+            aria-hidden="true"
           />
-          
+
           {/* Navigation Arrows */}
           <button
             onClick={prevImage}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+            className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow transition-colors"
+            aria-label="Ảnh trước"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           
           <button
             onClick={nextImage}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow transition-colors"
+            aria-label="Ảnh sau"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+
+          {/* Counter bottom-right */}
+          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+            {currentImage + 1}/{images.length}
+          </div>
         </div>
 
-        {/* Thumbnails */}
-        <div className="flex gap-2">
+        {/* Thumbnails (scroll ngang) */}
+        <div className="flex gap-3 overflow-x-auto pb-1">
           {images.map((image, index) => (
             <button
               key={index}
               onClick={() => handleThumbnailClick(index)}
-              className={`flex-1 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                currentImage === index ? 'border-teal-500' : 'border-gray-200'
+              className={`relative flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden border transition-all ${
+                currentImage === index
+                  ? 'border-teal-500 ring-2 ring-teal-300'
+                  : 'border-gray-200 hover:border-gray-300'
               }`}
+              aria-label={`Xem ảnh ${index + 1}`}
             >
-              <img
-                src={image}
-                alt={`Thumbnail ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
+              <img src={image} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

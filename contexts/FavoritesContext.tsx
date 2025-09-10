@@ -49,6 +49,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const toggleFavorite = async (postType: 'rent' | 'roommate', postId: number) => {
     if (!user?.userId) {
       alert('Vui lòng đăng nhập để sử dụng tính năng yêu thích');
+      if (typeof window !== 'undefined') window.location.href = '/login';
       return;
     }
 
@@ -67,7 +68,17 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         setFavorites(prev => [...prev, newFavorite]);
       }
     } catch (error: any) {
-      alert('Có lỗi xảy ra khi thêm/xóa yêu thích: ' + (error.message || ''));
+      const msg = error?.message || '';
+      if (error?.status === 401 || /unauthorized/i.test(msg)) {
+        alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để dùng Yêu thích.');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
+        return;
+      }
+      alert('Có lỗi xảy ra khi thêm/xóa yêu thích: ' + msg);
     }
   };
 

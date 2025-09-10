@@ -41,19 +41,18 @@ export default function RoomCard({
       aria-label={title}
     >
       {/* Ảnh bìa */}
-      <div className="relative h-48 bg-gray-200 overflow-hidden">
+      <div className="relative h-48 bg-gray-100 overflow-hidden">
         {cover ? (
           <img
             src={cover}
             alt={title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            className="w-full h-full object-cover"
             loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400" />
         )}
 
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
 
         {/* Verified */}
         {isVerified && (
@@ -156,10 +155,9 @@ export default function RoomCard({
               clipRule="evenodd"
             />
           </svg>
-          {address 
-            ? addressService.formatAddressForDisplay(address)
-            : city || ""
-          }
+          {address
+            ? addressService.formatWardCity(address)
+            : (city || "")}
         </div>
 
         {/* Giá */}

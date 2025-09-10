@@ -177,7 +177,8 @@ export default function RoomList() {
                 area={it.area}
                 bedrooms={it.bedrooms || 0}
                 bathrooms={it.bathrooms || 0}
-                city={it.location || ''}
+                // truyền address nếu có để RoomCard format phường + thành phố
+                {...(it.address ? { address: it.address as any } : { city: it.location || '' })}
                 price={it.price}
                 isVerified={it.isVerified || false}
               />

@@ -202,7 +202,11 @@ export default function RoommateForm() {
       showToast('error', 'Vui lòng nhập nghề nghiệp');
       return false;
     }
-    if (!roomAddress.ward.trim() || !roomAddress.city.trim() || !roomAddress.provinceCode.trim()) {
+    // Kiểm tra địa chỉ an toàn, không gọi trim trên giá trị có thể undefined/không phải string
+    const wardOk = typeof roomAddress.ward === 'string' && roomAddress.ward.trim().length > 0;
+    const cityOk = typeof roomAddress.city === 'string' && roomAddress.city.trim().length > 0;
+    const provinceOk = typeof roomAddress.provinceCode === 'string' && roomAddress.provinceCode.trim().length > 0;
+    if (!wardOk || !cityOk || !provinceOk) {
       showToast('error', 'Vui lòng chọn địa chỉ phòng');
       return false;
     }

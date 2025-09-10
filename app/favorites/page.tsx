@@ -10,6 +10,7 @@ import { listRentPosts } from "../../services/rentPosts";
 import { listRoommatePosts } from "../../services/roommatePosts";
 import { RentPostApi } from "../../types/RentPostApi";
 import { RoommatePost } from "../../services/roommatePosts";
+import { addressService } from "../../services/address";
 
 // Mock data cho danh sách yêu thích
 const mockFavorites = [
@@ -202,7 +203,8 @@ export default function FavoritesPage() {
                 category: post.category,
                 price: post.basicInfo.price,
                 area: post.basicInfo.area,
-                address: `${post.address.district}, ${post.address.city}`,
+                // Truyền object address trực tiếp (đã có ward/city) hoặc fallback format chuỗi an toàn
+                address: post.address || addressService.formatAddressForDisplay(post.address as any),
                 owner: "Chủ trọ",
                 phone: "0123456789",
                 addedAt: fav.createdAt.split('T')[0],
