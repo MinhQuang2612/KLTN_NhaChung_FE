@@ -48,15 +48,23 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
     <div className="bg-white rounded-lg shadow-md p-6">
       {/* Image Gallery Section */}
       <div className="space-y-4 mb-6">
-        {/* Main Image (object-contain, nền mờ, điều hướng, đếm trang) */}
+        {/* Main Image (object-cover với fallback, nền mờ, điều hướng, đếm trang) */}
         <div className="relative bg-gray-100 rounded-xl overflow-hidden">
-          <div className="w-full h-[420px] md:h-[500px] flex items-center justify-center">
+          <div className="w-full h-[420px] md:h-[500px] relative">
             <img
               src={images[currentImage]}
               alt="Phòng trọ"
-              className="max-h-full max-w-full object-contain"
+              className="w-full h-full object-cover"
               loading="lazy"
+              onError={(e) => {
+                // Fallback nếu ảnh lỗi
+                const target = e.target as HTMLImageElement;
+                target.style.objectFit = 'contain';
+                target.style.objectPosition = 'center';
+              }}
             />
+            {/* Overlay để đảm bảo text đọc được */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
           </div>
           <div
             className="pointer-events-none absolute inset-0 -z-10 bg-center bg-cover scale-110 blur-md opacity-40"

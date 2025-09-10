@@ -1,3 +1,6 @@
+"use client";
+
+import { useAuth } from "@/contexts/AuthContext";
 import HeroSection from "@/components/home/HeroSection";
 import WhyChooseUs from "@/components/home/WhyChooseUs";
 import FeaturedAreas from "@/components/home/FeaturedAreas";
@@ -10,14 +13,16 @@ import LandlordSection from "@/components/home/LandlordSection";
 import Footer from "@/components/common/Footer";
 
 export default function HomePage() {
+  const { user } = useAuth();
+
   return (
     <>
       <HeroSection />
       <WhyChooseUs />
       <FeaturedAreas />
       <CommunityStory />
-      <FindRoommate />
-      <Suggestions />
+      {user && <FindRoommate />}
+      {user &&  <Suggestions />}    
       <LatestNews />
       <Testimonials />
       <LandlordSection />

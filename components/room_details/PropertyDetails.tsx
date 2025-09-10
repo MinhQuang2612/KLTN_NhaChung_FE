@@ -1,5 +1,7 @@
 "use client";
 
+import { formatNumberVN, formatPriceWithSuffix } from "../../utils/format";
+
 interface PropertyDetailsProps {
   postData: any;
   postType: 'rent' | 'roommate';
@@ -188,15 +190,23 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
             <span className="text-gray-900 font-semibold text-red-600">{getPriceString()}</span>
           </div>
           <div className="flex justify-between">
+            <span className="text-gray-600">Đặt cọc:</span>
+            <span className="text-gray-900">
+              {postType === 'rent' && typeof postData?.basicInfo?.deposit === 'number' 
+                ? formatPriceWithSuffix(postData.basicInfo.deposit, '', 'auto')
+                : 'Chưa có thông tin'}
+            </span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-gray-600">Diện tích:</span>
             <span className="text-gray-900">{getAreaString()}</span>
           </div>
         </div>
       </div>
 
-      {/* Thông Tin Chi Tiết */}
+      {/* Tình Trạng Chi Tiết */}
       <div className="mb-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-3">Thông Tin Chi Tiết</h3>
+        <h4 className="text-base font-semibold text-gray-800 mb-3">Tình Trạng Chi Tiết</h4>
         <div className="border-t border-gray-200 pt-3 space-y-2">
           {postType === 'rent' && (
             <>
@@ -206,82 +216,6 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
               {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && typeof postData?.basicInfo?.bathrooms === 'number' && postData.basicInfo.bathrooms > 0 && (
                 <Row label="Nhà Vệ Sinh:" value={`${postData.basicInfo.bathrooms} WC`} />
               )}
-              {typeof postData?.basicInfo?.deposit === 'number' && (
-                <Row label="Đặt cọc:" value={`${(postData.basicInfo.deposit / 1000000).toFixed(1)} triệu`} />
-              )}
-            </>
-          )}
-          {postType === 'roommate' && (
-            <>
-              {/* Thông tin phòng & chi phí */}
-              <Row label="Loại phòng:" value={translateRoomType(postData?.currentRoom?.roomType)} />
-              {typeof postData?.currentRoom?.currentOccupants === 'number' && (
-                <Row label="Số người hiện tại:" value={String(postData.currentRoom.currentOccupants)} />
-              )}
-              <Row label="Thời hạn còn lại:" value={translateRemainingDuration(postData?.currentRoom?.remainingDuration)} />
-              {typeof postData?.currentRoom?.estimatedMonthlyUtilities === 'number' && (
-                <Row label="Ước tính chi phí/tháng:" value={`${postData.currentRoom.estimatedMonthlyUtilities.toLocaleString('vi-VN')} đ/tháng`} />
-              )}
-              {typeof postData?.currentRoom?.capIncludedAmount === 'number' && (
-                <Row label="Mức bao gồm tối đa:" value={`${postData.currentRoom.capIncludedAmount.toLocaleString('vi-VN')} đ`} />
-              )}
-              <Row label="Cách chia tiền điện nước:" value={translateShareMethod(postData?.currentRoom?.shareMethod)} />
-              {typeof postData?.currentRoom?.electricityPricePerKwh === 'number' && (
-                <Row label="Giá điện (đ/kWh):" value={postData.currentRoom.electricityPricePerKwh.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData?.currentRoom?.waterPrice === 'number' && (
-                <Row label="Giá nước:" value={`${postData.currentRoom.waterPrice.toLocaleString('vi-VN')} đ/${postData.currentRoom.waterBillingType === 'per_person' ? 'người' : 'm³'}`} />
-              )}
-              <Row label="Cách tính nước:" value={translateWaterBillingType(postData?.currentRoom?.waterBillingType)} />
-              {typeof postData?.currentRoom?.internetFee === 'number' && (
-                <Row label="Internet (đ/tháng):" value={postData.currentRoom.internetFee.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData?.currentRoom?.garbageFee === 'number' && (
-                <Row label="Rác (đ/tháng):" value={postData.currentRoom.garbageFee.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData?.currentRoom?.cleaningFee === 'number' && (
-                <Row label="Vệ sinh (đ/tháng):" value={postData.currentRoom.cleaningFee.toLocaleString('vi-VN')} />
-              )}
-
-              {/* Thông tin cá nhân */}
-              {postData?.personalInfo && (
-                <>
-                  <Row label="Họ và tên:" value={postData.personalInfo.fullName} />
-                  {typeof postData.personalInfo.age === 'number' && (
-                    <Row label="Tuổi:" value={String(postData.personalInfo.age)} />
-                  )}
-                  <Row label="Giới tính:" value={translateGender(postData.personalInfo.gender)} />
-                  <Row label="Nghề nghiệp:" value={postData.personalInfo.occupation} />
-                  {Array.isArray(postData.personalInfo.hobbies) && postData.personalInfo.hobbies.length > 0 && (
-                    <Row label="Sở thích:" value={postData.personalInfo.hobbies.join(', ')} />
-                  )}
-                  {Array.isArray(postData.personalInfo.habits) && postData.personalInfo.habits.length > 0 && (
-                    <Row label="Thói quen:" value={postData.personalInfo.habits.join(', ')} />
-                  )}
-                  <Row label="Thói quen sinh hoạt:" value={translateLifestyle(postData.personalInfo.lifestyle)} />
-                  <Row label="Mức độ sạch sẽ:" value={translateCleanliness(postData.personalInfo.cleanliness)} />
-                </>
-              )}
-
-              {/* Yêu cầu về người ở ghép */}
-              {postData?.requirements && (
-                <>
-                  {Array.isArray(postData.requirements.ageRange) && postData.requirements.ageRange.length === 2 && (
-                    <Row label="Độ tuổi mong muốn:" value={`${postData.requirements.ageRange[0]} - ${postData.requirements.ageRange[1]}`} />
-                  )}
-                  <Row label="Giới tính mong muốn:" value={translateGender(postData.requirements.gender)} />
-                  {Array.isArray(postData.requirements.traits) && postData.requirements.traits.length > 0 && (
-                    <Row label="Tính cách mong muốn:" value={postData.requirements.traits.join(', ')} />
-                  )}
-                  {typeof postData.requirements.maxPrice === 'number' && (
-                    <Row label="Giá tối đa (VNĐ/tháng):" value={postData.requirements.maxPrice.toLocaleString('vi-VN')} />
-                  )}
-                </>
-              )}
-            </>
-          )}
-          {postType === 'rent' && (
-            <>
               {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && postData?.basicInfo?.direction && (
                 <Row label="Hướng:" value={translateDirection(postData.basicInfo.direction)} />
               )}
@@ -293,91 +227,176 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
               )}
             </>
           )}
-
-          {/* Chi tiết theo loại bài đăng cho thuê */}
-          {postType === 'rent' && postData?.category === 'chung-cu' && postData?.chungCuInfo && (
+          {postType === 'roommate' && (
             <>
-              <Row label="Tên toà/Chung cư:" value={postData.chungCuInfo.buildingName} />
-              <Row label="Block/Tower:" value={postData.chungCuInfo.blockOrTower} />
-              <Row
-                label="Tầng:"
-                value={typeof postData.chungCuInfo.floorNumber === 'number' ? String(postData.chungCuInfo.floorNumber) : undefined}
-              />
-              <Row label="Mã căn:" value={postData.chungCuInfo.unitCode} />
-              <Row label="Loại hình:" value={translatePropertyType(postData.chungCuInfo.propertyType)} />
+              <Row label="Loại phòng:" value={translateRoomType(postData?.currentRoom?.roomType)} />
+              {typeof postData?.currentRoom?.currentOccupants === 'number' && (
+                <Row label="Số người hiện tại:" value={String(postData.currentRoom.currentOccupants)} />
+              )}
+              <Row label="Thời hạn còn lại:" value={translateRemainingDuration(postData?.currentRoom?.remainingDuration)} />
+              {typeof postData?.currentRoom?.estimatedMonthlyUtilities === 'number' && (
+                <Row label="Ước tính chi phí/tháng:" value={`${formatNumberVN(postData.currentRoom.estimatedMonthlyUtilities)} đ/tháng`} />
+              )}
+              {typeof postData?.currentRoom?.capIncludedAmount === 'number' && (
+                <Row label="Mức bao gồm tối đa:" value={`${formatNumberVN(postData.currentRoom.capIncludedAmount)} đ`} />
+              )}
+              <Row label="Cách chia tiền điện nước:" value={translateShareMethod(postData?.currentRoom?.shareMethod)} />
             </>
           )}
-
-          {postType === 'rent' && postData?.category === 'nha-nguyen-can' && postData?.nhaNguyenCanInfo && (
-            <>
-              <Row label="Khu/Lô:" value={postData.nhaNguyenCanInfo.khuLo} />
-              <Row label="Mã căn:" value={postData.nhaNguyenCanInfo.unitCode} />
-              <Row label="Loại hình:" value={translatePropertyType(postData.nhaNguyenCanInfo.propertyType)} />
-              <Row
-                label="Số tầng:"
-                value={typeof postData.nhaNguyenCanInfo.totalFloors === 'number' ? String(postData.nhaNguyenCanInfo.totalFloors) : undefined}
-              />
-              <Row
-                label="DT đất:"
-                value={typeof postData.nhaNguyenCanInfo.landArea === 'number' ? `${postData.nhaNguyenCanInfo.landArea} m²` : undefined}
-              />
-              <Row
-                label="DT sử dụng:"
-                value={typeof postData.nhaNguyenCanInfo.usableArea === 'number' ? `${postData.nhaNguyenCanInfo.usableArea} m²` : undefined}
-              />
-              <Row
-                label="Kích thước:"
-                value={
-                  typeof postData.nhaNguyenCanInfo.width === 'number' && typeof postData.nhaNguyenCanInfo.length === 'number'
-                    ? `${postData.nhaNguyenCanInfo.width} x ${postData.nhaNguyenCanInfo.length} m`
-                    : undefined
-                }
-              />
-            </>
-          )}
-
-          {/* Tiện ích & Chi phí theo dữ liệu utilities (nếu backend trả về) */}
-          {postData?.utilities && (
-            <>
-              {typeof postData.utilities.electricityPricePerKwh === 'number' && (
-                <Row label="Giá điện (đ/kWh):" value={postData.utilities.electricityPricePerKwh.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData.utilities.waterPrice === 'number' && (
-                <Row label="Giá nước:" value={`${postData.utilities.waterPrice.toLocaleString('vi-VN')} đ/${postData.utilities.waterBillingType === 'per_person' ? 'người' : 'm³'}`} />
-              )}
-              {postData.utilities.waterBillingType && (
-                <Row label="Cách tính nước:" value={translateWaterBillingType(postData.utilities.waterBillingType)} />
-              )}
-              {typeof postData.utilities.internetFee === 'number' && (
-                <Row label="Internet (đ/tháng):" value={postData.utilities.internetFee.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData.utilities.garbageFee === 'number' && (
-                <Row label="Rác (đ/tháng):" value={postData.utilities.garbageFee.toLocaleString('vi-VN')} />
-              )}
-              {typeof postData.utilities.cleaningFee === 'number' && (
-                <Row label="Vệ sinh (đ/tháng):" value={postData.utilities.cleaningFee.toLocaleString('vi-VN')} />
-              )}
-              {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && typeof postData.utilities.managementFee === 'number' && (
-                <Row label="Phí quản lý:" value={`${postData.utilities.managementFee.toLocaleString('vi-VN')} ${postData.utilities.managementFeeUnit === 'per_m2_per_month' ? 'đ/m²/tháng' : 'đ/tháng'}`} />
-              )}
-              {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && typeof postData.utilities.parkingCarFee === 'number' && (
-                <Row label="Bãi xe ô tô (đ/tháng):" value={postData.utilities.parkingCarFee.toLocaleString('vi-VN')} />
-              )}
-              {rentCategory === 'nha-nguyen-can' && typeof postData.utilities.gardeningFee === 'number' && (
-                <Row label="Chăm sóc vườn (đ/tháng):" value={postData.utilities.gardeningFee.toLocaleString('vi-VN')} />
-              )}
-            </>
-          )}
-          <div className="flex justify-between">
-            <span className="text-gray-600">Ngày Đăng:</span>
-            <span className="text-gray-900">
-              {postData?.createdAt 
-                ? new Date(postData.createdAt).toLocaleDateString('vi-VN')
-                : 'Chưa có thông tin'}
-            </span>
-          </div>
         </div>
       </div>
+
+      {/* Thông Tin Bất Động Sản */}
+      {postType === 'rent' && (postData?.category === 'chung-cu' || postData?.category === 'nha-nguyen-can') && (
+        <div className="mb-6">
+          <h4 className="text-base font-semibold text-gray-800 mb-3">Thông Tin Bất Động Sản</h4>
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            {postData?.category === 'chung-cu' && postData?.chungCuInfo && (
+              <>
+                <Row label="Tên toà/Chung cư:" value={postData.chungCuInfo.buildingName} />
+                <Row label="Block/Tower:" value={postData.chungCuInfo.blockOrTower} />
+                <Row
+                  label="Tầng:"
+                  value={typeof postData.chungCuInfo.floorNumber === 'number' ? String(postData.chungCuInfo.floorNumber) : undefined}
+                />
+                <Row label="Mã căn:" value={postData.chungCuInfo.unitCode} />
+                <Row label="Loại hình:" value={translatePropertyType(postData.chungCuInfo.propertyType)} />
+              </>
+            )}
+
+            {postData?.category === 'nha-nguyen-can' && postData?.nhaNguyenCanInfo && (
+              <>
+                <Row label="Khu/Lô:" value={postData.nhaNguyenCanInfo.khuLo} />
+                <Row label="Mã căn:" value={postData.nhaNguyenCanInfo.unitCode} />
+                <Row label="Loại hình:" value={translatePropertyType(postData.nhaNguyenCanInfo.propertyType)} />
+                <Row
+                  label="Số tầng:"
+                  value={typeof postData.nhaNguyenCanInfo.totalFloors === 'number' ? String(postData.nhaNguyenCanInfo.totalFloors) : undefined}
+                />
+                <Row
+                  label="DT đất:"
+                  value={typeof postData.nhaNguyenCanInfo.landArea === 'number' ? `${postData.nhaNguyenCanInfo.landArea} m²` : undefined}
+                />
+                <Row
+                  label="DT sử dụng:"
+                  value={typeof postData.nhaNguyenCanInfo.usableArea === 'number' ? `${postData.nhaNguyenCanInfo.usableArea} m²` : undefined}
+                />
+                <Row
+                  label="Kích thước:"
+                  value={
+                    typeof postData.nhaNguyenCanInfo.width === 'number' && typeof postData.nhaNguyenCanInfo.length === 'number'
+                      ? `${postData.nhaNguyenCanInfo.width} x ${postData.nhaNguyenCanInfo.length} m`
+                      : undefined
+                  }
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Chi Phí */}
+      {(postData?.utilities || (postType === 'roommate' && postData?.currentRoom)) && (
+        <div className="mb-6">
+          <h4 className="text-base font-semibold text-gray-800 mb-3">Chi Phí</h4>
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            {postType === 'rent' && postData?.utilities && (
+              <>
+                {typeof postData.utilities.electricityPricePerKwh === 'number' && (
+                  <Row label="Giá điện:" value={`${formatNumberVN(postData.utilities.electricityPricePerKwh)} đ/kWh`} />
+                )}
+                {typeof postData.utilities.waterPrice === 'number' && (
+                  <Row label="Giá nước:" value={`${formatNumberVN(postData.utilities.waterPrice)} đ/${postData.utilities.waterBillingType === 'per_person' ? 'người' : 'm³'}`} />
+                )}
+                {postData.utilities.waterBillingType && (
+                  <Row label="Cách tính nước:" value={translateWaterBillingType(postData.utilities.waterBillingType)} />
+                )}
+                {typeof postData.utilities.internetFee === 'number' && (
+                  <Row label="Internet:" value={`${formatNumberVN(postData.utilities.internetFee)} đ/tháng`} />
+                )}
+                {typeof postData.utilities.garbageFee === 'number' && (
+                  <Row label="Rác:" value={`${formatNumberVN(postData.utilities.garbageFee)} đ/tháng`} />
+                )}
+                {typeof postData.utilities.cleaningFee === 'number' && (
+                  <Row label="Vệ sinh:" value={`${formatNumberVN(postData.utilities.cleaningFee)} đ/tháng`} />
+                )}
+                {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && typeof postData.utilities.managementFee === 'number' && (
+                  <Row label="Phí quản lý:" value={`${formatNumberVN(postData.utilities.managementFee)} ${postData.utilities.managementFeeUnit === 'per_m2_per_month' ? 'đ/m²/tháng' : 'đ/tháng'}`} />
+                )}
+                {['chung-cu', 'nha-nguyen-can'].includes(String(rentCategory)) && typeof postData.utilities.parkingCarFee === 'number' && (
+                  <Row label="Bãi xe ô tô:" value={`${formatNumberVN(postData.utilities.parkingCarFee)} đ/tháng`} />
+                )}
+                {rentCategory === 'nha-nguyen-can' && typeof postData.utilities.gardeningFee === 'number' && (
+                  <Row label="Chăm sóc vườn:" value={`${formatNumberVN(postData.utilities.gardeningFee)} đ/tháng`} />
+                )}
+              </>
+            )}
+            {postType === 'roommate' && postData?.currentRoom && (
+              <>
+                {typeof postData.currentRoom.electricityPricePerKwh === 'number' && (
+                  <Row label="Giá điện:" value={`${formatNumberVN(postData.currentRoom.electricityPricePerKwh)} đ/kWh`} />
+                )}
+                {typeof postData.currentRoom.waterPrice === 'number' && (
+                  <Row label="Giá nước:" value={`${formatNumberVN(postData.currentRoom.waterPrice)} đ/${postData.currentRoom.waterBillingType === 'per_person' ? 'người' : 'm³'}`} />
+                )}
+                <Row label="Cách tính nước:" value={translateWaterBillingType(postData?.currentRoom?.waterBillingType)} />
+                {typeof postData.currentRoom.internetFee === 'number' && (
+                  <Row label="Internet:" value={`${formatNumberVN(postData.currentRoom.internetFee)} đ/tháng`} />
+                )}
+                {typeof postData.currentRoom.garbageFee === 'number' && (
+                  <Row label="Rác:" value={`${formatNumberVN(postData.currentRoom.garbageFee)} đ/tháng`} />
+                )}
+                {typeof postData.currentRoom.cleaningFee === 'number' && (
+                  <Row label="Vệ sinh:" value={`${formatNumberVN(postData.currentRoom.cleaningFee)} đ/tháng`} />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Thông Tin Cá Nhân (chỉ cho roommate) */}
+      {postType === 'roommate' && postData?.personalInfo && (
+        <div className="mb-6">
+          <h4 className="text-base font-semibold text-gray-800 mb-3">Thông Tin Cá Nhân</h4>
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            <Row label="Họ và tên:" value={postData.personalInfo.fullName} />
+            {typeof postData.personalInfo.age === 'number' && (
+              <Row label="Tuổi:" value={String(postData.personalInfo.age)} />
+            )}
+            <Row label="Giới tính:" value={translateGender(postData.personalInfo.gender)} />
+            <Row label="Nghề nghiệp:" value={postData.personalInfo.occupation} />
+            {Array.isArray(postData.personalInfo.hobbies) && postData.personalInfo.hobbies.length > 0 && (
+              <Row label="Sở thích:" value={postData.personalInfo.hobbies.join(', ')} />
+            )}
+            {Array.isArray(postData.personalInfo.habits) && postData.personalInfo.habits.length > 0 && (
+              <Row label="Thói quen:" value={postData.personalInfo.habits.join(', ')} />
+            )}
+            <Row label="Thói quen sinh hoạt:" value={translateLifestyle(postData.personalInfo.lifestyle)} />
+            <Row label="Mức độ sạch sẽ:" value={translateCleanliness(postData.personalInfo.cleanliness)} />
+          </div>
+        </div>
+      )}
+
+      {/* Yêu Cầu Về Người Ở Ghép (chỉ cho roommate) */}
+      {postType === 'roommate' && postData?.requirements && (
+        <div className="mb-6">
+          <h4 className="text-base font-semibold text-gray-800 mb-3">Yêu Cầu Về Người Ở Ghép</h4>
+          <div className="border-t border-gray-200 pt-3 space-y-2">
+            {Array.isArray(postData.requirements.ageRange) && postData.requirements.ageRange.length === 2 && (
+              <Row label="Độ tuổi mong muốn:" value={`${postData.requirements.ageRange[0]} - ${postData.requirements.ageRange[1]}`} />
+            )}
+            <Row label="Giới tính mong muốn:" value={translateGender(postData.requirements.gender)} />
+            {Array.isArray(postData.requirements.traits) && postData.requirements.traits.length > 0 && (
+              <Row label="Tính cách mong muốn:" value={postData.requirements.traits.join(', ')} />
+            )}
+            {typeof postData.requirements.maxPrice === 'number' && (
+              <Row label="Giá tối đa (VNĐ/tháng):" value={formatNumberVN(postData.requirements.maxPrice)} />
+            )}
+          </div>
+        </div>
+      )}
+
 
       {/* Thông Tin Thêm */}
       <div className="mb-6">

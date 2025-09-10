@@ -3,20 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { listRoommatePosts, RoommatePost } from "../../services/roommatePosts";
-
-// Mock data for fallback
-const mockPosts = [
-    { id:1, img:"/home/room.png", text:"Tụi mình cần tìm bạn ở ghép IUH, có đủ mọi thứ xách đồ vào là ở nhé." },
-    { id:2, img:"/home/room.png", text:"Cần 1 nữ ở ghép khu Tân Bình, phòng mới sạch." },
-    { id:3, img:"/home/room.png", text:"Tìm bạn ở ghép gần Phú Nhuận, giờ giấc tự do." },
-    { id:4, img:"/home/room.png", text:"Cần bạn ở ghép khu vực Quận 1, gần trường đại học." },
-    { id:5, img:"/home/room.png", text:"Tìm bạn ở ghép gần Bình Thạnh, phòng có điều hòa." },
-    { id:6, img:"/home/room.png", text:"Cần 1 nam ở ghép khu Gò Vấp, giờ giấc linh hoạt." },
-  ];
+import { useAuth } from "../../contexts/AuthContext";
   
   export default function FindRoommate(){
     const router = useRouter();
-    const [posts, setPosts] = useState<any[]>(mockPosts);
+    const { user } = useAuth();
+    const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Load roommate posts from API
@@ -43,11 +35,10 @@ const mockPosts = [
             };
           });
           
-          if (transformedPosts.length > 0) {
-            setPosts(transformedPosts);
-          }
+          setPosts(transformedPosts);
         } catch (error) {
-          // Keep mock data as fallback
+          console.error("Error loading roommate posts:", error);
+          setPosts([]);
         } finally {
           setLoading(false);
         }
@@ -72,6 +63,11 @@ const mockPosts = [
       router.push(`/room_details/roommate-${postId}`);
     };
 
+    // Chỉ hiển thị khi user đã đăng nhập
+    if (!user) {
+      return null;
+    }
+
     return (
       <section className="py-6">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -86,6 +82,12 @@ const mockPosts = [
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-4"></div>
                   <p className="text-gray-600 text-sm">Đang tải...</p>
+                </div>
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <p className="text-gray-600 text-sm">Chưa có bài đăng tìm ở ghép nào</p>
                 </div>
               </div>
             ) : (

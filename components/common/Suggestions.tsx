@@ -27,17 +27,17 @@ function CardItem({ c }: { c: Card }) {
 
   return (
     <div
-      className="rounded-2xl overflow-hidden shadow border border-slate-100 bg-white hover:shadow-lg transition-shadow cursor-pointer hover:scale-105 transition-transform duration-300"
+      className="rounded-2xl overflow-hidden shadow border border-slate-100 bg-white hover:shadow-lg transition-shadow cursor-pointer hover:scale-105 transition-transform duration-300 h-full flex flex-col"
       onClick={handleCardClick}
     >
       <div className="relative">
         <img src={c.img} alt={c.title} className="h-44 w-full object-cover" />
       </div>
-      <div className="p-4">
-        <h4 className="font-semibold text-gray-900">{c.title}</h4>
+      <div className="p-4 flex flex-col flex-1">
+        <h4 className="font-semibold text-gray-900 line-clamp-2 min-h-[2.5rem]">{c.title}</h4>
         <p className="mt-1 text-sm text-slate-600">{c.specs}</p>
         <p className="text-sm text-slate-600">{c.area}</p>
-        <p className="mt-2 font-bold text-teal-600">{c.price}</p>
+        <p className="mt-2 font-bold text-teal-600 mt-auto">{c.price}</p>
       </div>
     </div>
   );
@@ -164,7 +164,7 @@ export default function Suggestions() {
               {/* Cards Container */}
               <div
                 id="suggestions-scroll"
-                className="flex gap-6 overflow-x-hidden scroll-smooth pb-4"
+                className="flex gap-6 overflow-x-hidden scroll-smooth pb-4 items-stretch"
               >
                 {items.map((i, index) => (
                   <div key={`${i.id}-${i.postType}-${index}`} className="flex-shrink-0 w-80">
