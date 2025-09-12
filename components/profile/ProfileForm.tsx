@@ -1,5 +1,7 @@
 "use client";
 
+import { type ReactNode } from "react";
+
 interface ProfileFormProps {
   formData: {
     name: string;
@@ -14,6 +16,28 @@ interface ProfileFormProps {
   onSave: () => void;
   onCancel: () => void;
   onEditClick: () => void;
+}
+
+function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
+  return (
+    <fieldset
+      className={`rounded-lg border ${className}`}
+      onClick={(e) => {
+        const el = (e.currentTarget as HTMLElement).querySelector(
+          "input, select, textarea, [contenteditable=true]"
+        ) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null);
+        el?.focus();
+      }}
+    >
+      <legend className="px-2 ml-2 text-sm text-gray-700">
+        {label}
+        {required && <span className="text-red-500"> *</span>}
+      </legend>
+      <div className="px-3 pb-2 pt-0.5">
+        {children}
+      </div>
+    </fieldset>
+  );
 }
 
 export default function ProfileForm({ 
@@ -58,44 +82,32 @@ export default function ProfileForm({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Họ và tên */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Họ và tên
-          </label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FieldBox label="Họ và tên">
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={onInputChange}
             disabled={!isEditing}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-50 disabled:text-gray-500"
+            className="w-full px-2 py-1.5 text-sm outline-none disabled:bg-gray-50 disabled:text-gray-500"
           />
-        </div>
+        </FieldBox>
 
-        {/* Email */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email
-          </label>
+        <FieldBox label="Email">
           <input
             type="email"
             name="email"
             value={formData.email}
-            disabled={true} // Luôn disabled vì không thể chỉnh sửa
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+            disabled={true}
+            className="w-full px-2 py-1.5 text-sm outline-none bg-gray-100 text-gray-500 cursor-not-allowed"
           />
           <p className="text-xs text-gray-500 mt-1">
             Email không thể thay đổi. Liên hệ admin nếu cần hỗ trợ.
           </p>
-        </div>
+        </FieldBox>
 
-        {/* Số điện thoại */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Số điện thoại
-          </label>
+        <FieldBox label="Số điện thoại">
           <input
             type="tel"
             name="phone"
@@ -103,15 +115,11 @@ export default function ProfileForm({
             onChange={onInputChange}
             disabled={!isEditing}
             placeholder="Nhập số điện thoại"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-50 disabled:text-gray-500"
+            className="w-full px-2 py-1.5 text-sm outline-none disabled:bg-gray-50 disabled:text-gray-500"
           />
-        </div>
+        </FieldBox>
 
-        {/* Avatar Upload */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ảnh đại diện
-          </label>
+        <FieldBox label="Ảnh đại diện">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
               <img
@@ -132,14 +140,14 @@ export default function ProfileForm({
                 accept="image/*"
                 onChange={onAvatarChange}
                 disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 disabled:bg-gray-50 disabled:text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+                className="w-full text-sm disabled:bg-gray-50 disabled:text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Chọn ảnh từ máy tính của bạn (JPG, PNG, GIF)
               </p>
             </div>
           </div>
-        </div>
+        </FieldBox>
       </div>
     </div>
   );
