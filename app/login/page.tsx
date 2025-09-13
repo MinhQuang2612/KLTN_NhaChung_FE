@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
+import { getRandomVideo } from "../../config/cloudinary";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,10 +14,8 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Random chọn video nền
-    const videos = ["/videopanel.mp4", "/videopanel1.mp4"];
-    const randomVideo = videos[Math.floor(Math.random() * videos.length)];
-    setBackgroundVideo(randomVideo);
+    // Random chọn video nền từ Cloudinary
+    setBackgroundVideo(getRandomVideo());
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

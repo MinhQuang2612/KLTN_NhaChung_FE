@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRegister } from "@/hooks/useRegister";
 import { resendRegistrationOtp, verifyRegistration, loginService } from "@/services/auth";
 import { extractApiErrorMessage } from "@/utils/api";
+import { getRandomVideo } from "@/config/cloudinary";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
   return (
@@ -46,10 +47,8 @@ export default function RegisterFlow() {
   });
 
   useEffect(() => {
-    // Random chọn video nền
-    const videos = ["/videopanel.mp4", "/videopanel1.mp4"];
-    const randomVideo = videos[Math.floor(Math.random() * videos.length)];
-    setBackgroundVideo(randomVideo);
+    // Random chọn video nền từ Cloudinary
+    setBackgroundVideo(getRandomVideo());
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
