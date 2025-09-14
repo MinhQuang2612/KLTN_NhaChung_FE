@@ -6,7 +6,7 @@ export interface BudgetRange { min?: number; max?: number }
 export interface UserProfile {
   profileId?: number;
   userId?: number;
-  age?: number;
+  dateOfBirth?: string; // Format: YYYY-MM-DD
   gender?: 'male' | 'female' | 'other';
   occupation?: string;
   income?: number;
@@ -40,6 +40,34 @@ export interface UserProfile {
 
 export function createProfile(data: UserProfile) {
   return apiPost<UserProfile>("user-profiles", data);
+}
+
+// Tạo profile không cần token (cho registration flow)
+export function createProfilePublic(data: UserProfile) {
+  // Chỉ gửi profile data với userId thật
+  return apiPost<UserProfile>("user-profiles", data, { skipAuth: true });
+}
+
+// Fallback: Tạo profile với API khác nếu cần
+export function createProfilePublicFallback(data: UserProfile & { email: string }) {
+  // Gọi API trực tiếp không qua wrapper
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
+  const url = `${API_BASE}/user-profiles`;
+  
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // Không có Authorization header
+    },
+    body: JSON.stringify(data),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+    return res.json();
+  });
 }
 
 export function getMyProfile(userId: number) {

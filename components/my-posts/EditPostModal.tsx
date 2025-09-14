@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { updateRentPost } from "../../services/rentPosts";
 import { updateRoommatePost } from "../../services/roommatePosts";
 import { uploadFiles } from "../../utils/upload";
+import { AgeUtils } from "../../utils/ageUtils";
 import type { Category } from "../../types/RentPostApi";
 import type { LocalMediaItem } from "../common/MediaPickerLocal";
 import EditFormRenderer from "./EditFormRenderer";
@@ -55,7 +56,7 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
           existingVideos: post.video ? [post.video] : [],
           // Personal info
           fullName: post.personalInfo?.fullName || '',
-          age: post.personalInfo?.age || 0,
+          dateOfBirth: post.personalInfo?.dateOfBirth || '',
           gender: post.personalInfo?.gender || '',
           occupation: post.personalInfo?.occupation || '',
           selectedHobbies: Array.isArray(post.personalInfo?.hobbies) ? post.personalInfo.hobbies : 
@@ -317,12 +318,11 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
         rmPayload.video = allVideoUrls.length > 0 ? allVideoUrls[0] : null;
 
         // Map personalInfo only if has required fields
-        const ageNum = Number(formData.age);
         const gender = formData.gender as 'male' | 'female' | 'other';
-        if (ageNum && ageNum >= 18 && ageNum <= 100 && gender) {
+        if (formData.dateOfBirth && AgeUtils.isAdult(formData.dateOfBirth) && gender) {
           rmPayload.personalInfo = {
             fullName: formData.fullName || '',
-            age: ageNum,
+            dateOfBirth: formData.dateOfBirth,
             gender: gender,
             occupation: formData.occupation || '',
             hobbies: Array.isArray(formData.selectedHobbies) ? formData.selectedHobbies : [],

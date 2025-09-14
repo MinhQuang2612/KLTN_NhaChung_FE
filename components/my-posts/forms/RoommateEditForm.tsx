@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import MediaPickerPanel, { LocalMediaItem } from '@/components/common/MediaPickerLocal';
 import AddressSelector from '@/components/common/AddressSelector';
 import { Address, addressService } from '@/services/address';
+import { AgeUtils } from '@/utils/ageUtils';
 
 // Address Modal Component
 function AddressModal({
@@ -210,8 +211,29 @@ export default function RoommateEditForm({ formData, onInputChange, onNumberChan
             <input type="text" value={formData.fullName || ''} onChange={(e) => onInputChange('fullName', e.target.value)} placeholder="Họ và tên" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tuổi *</label>
-            <input type="number" value={formData.age || ''} onChange={(e) => onInputChange('age', parseInt(e.target.value) || 0)} placeholder="Tuổi" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ngày sinh *</label>
+            <input 
+              type="date" 
+              value={formData.dateOfBirth || ''} 
+              onChange={(e) => onInputChange('dateOfBirth', e.target.value)} 
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+            />
+            {formData.dateOfBirth && (
+              <div className="text-xs mt-1">
+                <span className="text-gray-500">
+                  {AgeUtils.getAgeInfo(formData.dateOfBirth).ageText}
+                </span>
+                {!AgeUtils.isAdult(formData.dateOfBirth) && (
+                  <span className="text-red-500 ml-2">
+                    ⚠️ Phải đủ 18 tuổi
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="text-xs text-gray-400 mt-1">
+              * Bạn phải đủ 18 tuổi để sử dụng dịch vụ này
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Giới tính *</label>

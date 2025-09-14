@@ -23,6 +23,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const token = localStorage.getItem("token");
       const storedUser = localStorage.getItem("user");
+      const isRegistrationFlow = localStorage.getItem("isRegistrationFlow");
+      const registrationData = localStorage.getItem("registrationData");
+      
+      // Nếu đang trong quá trình đăng ký và chưa có user thật, không tự động đăng nhập
+      if (isRegistrationFlow === "true" && registrationData && !storedUser) {
+        setIsLoading(false);
+        return;
+      }
       
       if (token) {
         try {

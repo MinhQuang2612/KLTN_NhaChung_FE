@@ -1,6 +1,7 @@
 "use client";
 
 import { formatNumberVN, formatPriceWithSuffix } from "../../utils/format";
+import { AgeUtils } from "@/utils/ageUtils";
 
 interface PropertyDetailsProps {
   postData: any;
@@ -361,8 +362,8 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
           <h4 className="text-base font-semibold text-gray-800 mb-3">Thông Tin Cá Nhân</h4>
           <div className="border-t border-gray-200 pt-3 space-y-2">
             <Row label="Họ và tên:" value={postData.personalInfo.fullName} />
-            {typeof postData.personalInfo.age === 'number' && (
-              <Row label="Tuổi:" value={String(postData.personalInfo.age)} />
+            {postData.personalInfo.dateOfBirth && (
+              <Row label="Tuổi:" value={AgeUtils.getAgeInfo(postData.personalInfo.dateOfBirth).ageText} />
             )}
             <Row label="Giới tính:" value={translateGender(postData.personalInfo.gender)} />
             <Row label="Nghề nghiệp:" value={postData.personalInfo.occupation} />

@@ -102,11 +102,13 @@ export default function AddressSelector({ value, onChange, className = "", field
       const loadWards = async () => {
         setLoading(true);
         try {
+          console.log('Loading wards for province:', selectedProvince);
           const wardsData = await addressService.getWardsByProvince(selectedProvince);
+          console.log('Wards data received:', wardsData);
           setWards(wardsData);
-      } catch (error) {
-        // Handle error silently
-      } finally {
+        } catch (error) {
+          console.error('Error loading wards:', error);
+        } finally {
           setLoading(false);
         }
       };
@@ -160,11 +162,18 @@ export default function AddressSelector({ value, onChange, className = "", field
   }, [selectedProvince, selectedWard, street, specificAddress, showSpecificAddress, additionalInfo, provinces, wards]);
 
   const handleProvinceSelect = (province: Province) => {
+    console.log('Province selected:', province);
     setSelectedProvince(province.provinceCode);
     setProvinceSearch(province.provinceName);
     setShowProvinceDropdown(false);
     setSelectedWard(''); // Reset ward when province changes
     setWardSearch('');
+    setShowWardDropdown(false); // Close ward dropdown when province changes
+    
+    // Auto-open ward dropdown after a short delay to allow wards to load
+    setTimeout(() => {
+      setShowWardDropdown(true);
+    }, 500);
   };
 
   const handleWardSelect = (ward: Ward) => {
@@ -277,19 +286,28 @@ export default function AddressSelector({ value, onChange, className = "", field
         {/* Ward Dropdown */}
         {showWardDropdown && selectedProvince && (
           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-            {filteredWards.length > 0 ? (
-              filteredWards.map((ward) => (
-                <div
-                  key={ward.wardCode}
-                  onClick={() => handleWardSelect(ward)}
-                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                >
-                  {ward.wardName}
+            {loading ? (
+              <div className="px-3 py-2 text-gray-500 text-sm">
+                Đang tải danh sách phường/xã...
+              </div>
+            ) : filteredWards.length > 0 ? (
+              <>
+                <div className="px-3 py-1 text-xs text-gray-400 border-b">
+                  Tìm thấy {filteredWards.length} phường/xã
                 </div>
-              ))
+                {filteredWards.map((ward) => (
+                  <div
+                    key={ward.wardCode}
+                    onClick={() => handleWardSelect(ward)}
+                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                  >
+                    {ward.wardName}
+                  </div>
+                ))}
+              </>
             ) : (
               <div className="px-3 py-2 text-gray-500 text-sm">
-                Không tìm thấy phường/xã
+                {selectedProvince ? "Không tìm thấy phường/xã" : "Chọn Tỉnh/Thành phố để hiện danh sách phường"}
               </div>
             )}
           </div>

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { createProfile, getMyProfile, updateMyProfile, UserProfile } from "@/services/userProfiles";
+import { createProfile, createProfilePublic, createProfilePublicFallback, getMyProfile, updateMyProfile, UserProfile } from "@/services/userProfiles";
 import AddressSelector from "@/components/common/AddressSelector";
 import { addressService, type Address, type Ward } from "@/services/address";
 import { uploadFiles } from "@/utils/upload";
+import { AgeUtils } from "@/utils/ageUtils";
+import { User } from "@/types/User";
+import { loginService } from "@/services/auth";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
   return (
@@ -31,6 +35,7 @@ function FieldBox({ label, children, className = "", required = false }: { label
 
 export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState<UserProfile>({});
@@ -45,16 +50,73 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   const [licensePreview, setLicensePreview] = useState<string>("");
   // UX helpers for required hints
   const [focusedField, setFocusedField] = useState<string>("");
+  // Local user state for registration flow
+  const [localUser, setLocalUser] = useState<User | null>(null);
 
   // helpers
   const toNumber = (v: string): number | undefined => (v === "" ? undefined : Number(v));
+  
+  // Helper để format date cho input type="date"
+  const formatDateForInput = (dateString?: string): string => {
+    if (!dateString) return "";
+    return dateString;
+  };
 
+  // useEffect để load user data từ localStorage (chỉ chạy 1 lần)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const storedUser = localStorage.getItem("user");
+    const registrationData = localStorage.getItem("registrationData");
+    const isRegistrationFlow = localStorage.getItem("isRegistrationFlow");
+    
+    // Nếu đã có localUser hoặc user từ AuthContext, không cần làm gì
+    if (localUser || user?.userId) return;
+    
+    if (storedUser && isRegistrationFlow === "true") {
+      try {
+        const userData = JSON.parse(storedUser);
+        setLocalUser(userData);
+        return;
+      } catch (error) {
+        console.error("Error parsing stored user:", error);
+      }
+    } else if (registrationData && isRegistrationFlow === "true") {
+      // Nếu có registrationData nhưng chưa có user (chưa login)
+      try {
+        const regData = JSON.parse(registrationData);
+        // Tạo temporary user object từ registration data
+        const tempUser: User = {
+          userId: 0, // Temporary ID
+          name: regData.name,
+          email: regData.email,
+          role: regData.role,
+          phone: regData.phone,
+          avatar: regData.avatar,
+          isVerified: true,
+          createdAt: regData.verifiedAt
+        };
+        setLocalUser(tempUser);
+        return;
+      } catch (error) {
+        console.error("Error parsing registration data:", error);
+      }
+    }
+  }, []); // Empty dependency array - chỉ chạy 1 lần
+
+  // useEffect để load profile data khi có user
   useEffect(() => {
     const fetch = async () => {
-      if (!user?.userId) return;
+      // Sử dụng localUser nếu có, nếu không thì dùng user từ AuthContext
+      const currentUser = localUser || user;
+      
+      if (!currentUser?.userId) {
+        return; // Không có user, không load profile
+      }
+      
       try {
         setLoading(true);
-        const p = await getMyProfile(user.userId);
+        const p = await getMyProfile(currentUser.userId);
         setData(p || {});
         // Hydrate address line to UI (best effort)
         if (p?.currentLocation) setCurrentAddress({
@@ -72,7 +134,7 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       }
     };
     fetch();
-  }, [user?.userId]);
+  }, [user?.userId, localUser?.userId]); // Chỉ depend vào userId, không phải toàn bộ object
 
   // Load ward options when city (provinceCode) changes, reset preferred wards if city changes
   useEffect(() => {
@@ -125,7 +187,46 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   }, []);
 
   const save = async () => {
-    if (!user?.userId) return;
+    const currentUser = localUser || user;
+    
+    // Nếu không có user, thử lấy từ registrationData
+    if (!currentUser?.userId && currentUser?.userId !== 0) {
+      if (typeof window !== "undefined") {
+        const registrationData = localStorage.getItem("registrationData");
+        const isRegistrationFlow = localStorage.getItem("isRegistrationFlow");
+        
+        if (registrationData && isRegistrationFlow === "true") {
+          try {
+            const regData = JSON.parse(registrationData);
+            // Tạo temporary user object từ registration data
+            const tempUser: User = {
+              userId: 0, // Temporary ID
+              name: regData.name,
+              email: regData.email,
+              role: regData.role,
+              phone: regData.phone,
+              avatar: regData.avatar,
+              isVerified: true,
+              createdAt: regData.verifiedAt
+            };
+            setLocalUser(tempUser);
+            // Tiếp tục với tempUser
+          } catch (error) {
+            setError("Không thể tải thông tin đăng ký. Vui lòng thử lại.");
+            return;
+          }
+        } else {
+          setError("Không tìm thấy thông tin người dùng. Vui lòng đăng ký lại.");
+          return;
+        }
+      } else {
+        setError("Không tìm thấy thông tin người dùng. Vui lòng đăng ký lại.");
+        return;
+      }
+    }
+    
+    const actualUser = localUser || user;
+    
     try {
       setLoading(true);
       const errs: string[] = [];
@@ -139,6 +240,20 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       if (!data.gender) errs.push("Vui lòng chọn giới tính");
       if (!data.occupation || !data.occupation.trim()) errs.push("Vui lòng nhập nghề nghiệp");
       if (data.income != null && data.income < 0) errs.push("Thu nhập không hợp lệ");
+      
+      // Validate dateOfBirth - Bắt buộc phải đủ 18 tuổi
+      if (!data.dateOfBirth) {
+        errs.push("Vui lòng nhập ngày sinh");
+      } else {
+        const dateValidation = AgeUtils.validateDateOfBirth(data.dateOfBirth);
+        if (!dateValidation.isValid) {
+          errs.push(dateValidation.message || "Ngày sinh không hợp lệ");
+        } else {
+          if (!AgeUtils.isAdult(data.dateOfBirth)) {
+            errs.push("Bạn phải đủ 18 tuổi để sử dụng dịch vụ này");
+          }
+        }
+      }
       if (data.budgetRange) {
         const { min, max } = data.budgetRange;
         if (min != null && min < 0) errs.push("Ngân sách tối thiểu không hợp lệ");
@@ -172,23 +287,102 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
         setLoading(false);
         return;
       }
+      
+      // Kiểm tra nếu đang trong quá trình đăng ký
+      const isRegistrationFlow = typeof window !== "undefined" && localStorage.getItem("isRegistrationFlow") === "true";
+      const registrationData = typeof window !== "undefined" ? localStorage.getItem("registrationData") : null;
+      
+      let actualUser = localUser || user;
+      
+      // Nếu đang trong registration flow và có registrationData, tạo user từ đó
+      if (isRegistrationFlow && registrationData && actualUser?.userId === 0) {
+        try {
+          const regData = JSON.parse(registrationData);
+          console.log("Registration data:", regData);
+          console.log("UserId from registration data:", regData.userId);
+          
+          // Tạo user object từ registration data với userId thật
+          const userFromReg: User = {
+            userId: regData.userId || 0, // Sử dụng userId thật từ backend
+            name: regData.name,
+            email: regData.email,
+            role: regData.role,
+            phone: regData.phone,
+            avatar: regData.avatar,
+            isVerified: true,
+            createdAt: regData.verifiedAt
+          };
+          console.log("User from registration:", userFromReg);
+          actualUser = userFromReg;
+        } catch (error) {
+          console.error("Error parsing registration data:", error);
+          setError("Không thể tải thông tin đăng ký. Vui lòng thử lại.");
+          setLoading(false);
+          return;
+        }
+      }
+      
+      if (!actualUser) {
+        setError("Không tìm thấy thông tin người dùng. Vui lòng thử lại.");
+        setLoading(false);
+        return;
+      }
+      
       const currentLocationText = currentAddress
         ? `${currentAddress.ward || currentAddress.wardName || ""}, ${currentAddress.city || currentAddress.provinceName || ""}`.replace(/^,\s*|\s*,\s*$/g, "")
         : data.currentLocation;
 
       const payload: UserProfile = {
         ...data,
-        userId: user.userId,
+        userId: actualUser.userId,
         currentLocation: currentLocationText,
         preferredDistricts: preferredWards,
       };
 
+      console.log("Creating profile with userId:", actualUser.userId);
+      console.log("Is registration flow:", isRegistrationFlow);
+      console.log("Payload:", payload);
+      
       try {
-        await createProfile(payload);
-      } catch {
-        await updateMyProfile(user.userId, payload);
+        if (isRegistrationFlow && actualUser.userId > 0) {
+          // Sử dụng API public cho registration flow với userId thật
+          console.log("Creating profile with public API:", payload);
+          try {
+            await createProfilePublic(payload);
+          } catch (error) {
+            console.log("Public API failed, trying fallback:", error);
+            await createProfilePublicFallback({
+              ...payload,
+              email: actualUser.email
+            });
+          }
+        } else if (isRegistrationFlow && actualUser.userId === 0) {
+          console.error("No userId found in registration flow");
+          throw new Error("Không tìm thấy userId. Vui lòng thử lại từ đầu.");
+        } else {
+          // Sử dụng API thông thường cho user đã đăng nhập
+          console.log("Creating profile with regular API:", payload);
+          await createProfile(payload);
+        }
+      } catch (error) {
+        console.error("Profile creation error:", error);
+        // Nếu tạo mới thất bại, thử cập nhật (chỉ cho user đã đăng nhập)
+        if (!isRegistrationFlow) {
+          console.log("Trying to update profile instead");
+          await updateMyProfile(actualUser.userId, payload);
+        } else {
+          throw new Error("Không thể tạo profile. Vui lòng thử lại.");
+        }
       }
-      window.location.href = "/";
+      
+      // Xóa flag đăng ký và chuyển về trang chủ
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("isRegistrationFlow");
+        localStorage.removeItem("registrationData");
+      }
+      
+      // Sử dụng router.push thay vì window.location.href để giữ state
+      router.push("/");
     } catch (e: any) {
       setError(e?.body?.message || e?.message || "Lưu khảo sát thất bại");
     } finally {
@@ -203,8 +397,30 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
 
       {role === "user" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FieldBox label="Tuổi">
-            <input type="number" className="w-full px-2 py-1.5 text-sm outline-none" value={data.age ?? ""} onChange={e=>setData(d=>({...d, age: toNumber(e.target.value)}))} />
+          <FieldBox label="Ngày sinh" required>
+            <input 
+              type="date" 
+              className="w-full px-2 py-1.5 text-sm outline-none" 
+              value={formatDateForInput(data.dateOfBirth)} 
+              onChange={e => setData(d => ({ ...d, dateOfBirth: e.target.value }))}
+              max={new Date().toISOString().split('T')[0]} // Không cho phép chọn ngày trong tương lai
+              required
+            />
+            {data.dateOfBirth && (
+              <div className="text-xs mt-1">
+                <span className="text-gray-500">
+                  {AgeUtils.getAgeInfo(data.dateOfBirth).ageText}
+                </span>
+                {!AgeUtils.isAdult(data.dateOfBirth) && (
+                  <span className="text-red-500 ml-2">
+                    ⚠️ Phải đủ 18 tuổi
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="text-xs text-gray-400 mt-1">
+              * Bạn phải đủ 18 tuổi để sử dụng dịch vụ này
+            </div>
           </FieldBox>
           <FieldBox label="Giới tính">
             <select className="w-full px-2 py-1.5 text-sm outline-none" value={data.gender ?? ""} onChange={e=>setData(d=>({...d, gender: (e.target.value || undefined) as UserProfile["gender"]}))}>
@@ -215,7 +431,52 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
             </select>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Nghề nghiệp">
-            <input className="w-full px-2 py-1.5 text-sm outline-none" value={data.occupation ?? ""} onChange={e=>setData(d=>({...d, occupation: e.target.value }))} />
+            <select className="w-full px-2 py-1.5 text-sm outline-none" value={data.occupation ?? ""} onChange={e=>setData(d=>({...d, occupation: e.target.value }))}>
+              <option value="" disabled>Chọn nghề nghiệp</option>
+              <option value="sinh_vien">Sinh viên</option>
+              <option value="hoc_sinh">Học sinh</option>
+              <option value="nhan_vien_van_phong">Nhân viên văn phòng</option>
+              <option value="hanh_chinh">Hành chính</option>
+              <option value="ca_dem">Ca đêm</option>
+              <option value="tu_do">Tự do</option>
+              <option value="kinh_doanh">Kinh doanh</option>
+              <option value="giao_vien">Giáo viên</option>
+              <option value="bac_si">Bác sĩ</option>
+              <option value="ky_su">Kỹ sư</option>
+              <option value="luat_su">Luật sư</option>
+              <option value="thiet_ke">Thiết kế</option>
+              <option value="marketing">Marketing</option>
+              <option value="it">IT/Công nghệ thông tin</option>
+              <option value="ngan_hang">Ngân hàng</option>
+              <option value="ban_hang">Bán hàng</option>
+              <option value="dich_vu">Dịch vụ</option>
+              <option value="nong_nghiep">Nông nghiệp</option>
+              <option value="cong_nhan">Công nhân</option>
+              <option value="tai_xe">Tài xế</option>
+              <option value="dau_bep">Đầu bếp</option>
+              <option value="tho_lam_toc">Thợ làm tóc</option>
+              <option value="tho_sua_chua">Thợ sửa chữa</option>
+              <option value="tho_dien">Thợ điện</option>
+              <option value="tho_ong_nuoc">Thợ ống nước</option>
+              <option value="bao_ve">Bảo vệ</option>
+              <option value="lau_don">Lau dọn</option>
+              <option value="giao_hang">Giao hàng</option>
+              <option value="shipper">Shipper</option>
+              <option value="grab_uber">Grab/Uber</option>
+              <option value="youtuber">YouTuber</option>
+              <option value="streamer">Streamer</option>
+              <option value="freelancer">Freelancer</option>
+              <option value="thu_ky">Thư ký</option>
+              <option value="ke_toan">Kế toán</option>
+              <option value="nhan_su">Nhân sự</option>
+              <option value="ban_giam_doc">Ban giám đốc</option>
+              <option value="quan_ly">Quản lý</option>
+              <option value="giam_doc">Giám đốc</option>
+              <option value="chu_tich">Chủ tịch</option>
+              <option value="nghi_huu">Nghỉ hưu</option>
+              <option value="that_nghiep">Thất nghiệp</option>
+              <option value="khac">Khác</option>
+            </select>
           </FieldBox>
           <FieldBox label="Thu nhập (ước tính)">
             <input type="number" className="w-full px-2 py-1.5 text-sm outline-none" value={data.income ?? ""} onChange={e=>setData(d=>({...d, income: toNumber(e.target.value)}))} />
@@ -248,7 +509,55 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
             <input type="number" className="w-full px-2 py-1.5 text-sm outline-none" value={data.budgetRange?.max ?? ""} onChange={e=>setData(d=>({...d, budgetRange: { ...(d.budgetRange||{}), max: toNumber(e.target.value) }}))} />
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Tiện ích ưu tiên">
-            <input className="w-full px-2 py-1.5 text-sm outline-none" placeholder="wifi, parking, gym" value={(data.amenities || []).join(", ")} onChange={e=>setData(d=>({...d, amenities: e.target.value.split(",").map(s=>s.trim())}))} />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {[
+                  { v: "wifi", t: "Wifi" },
+                  { v: "bai_do_xe", t: "Bãi đỗ xe" },
+                  { v: "gym", t: "Gym" },
+                  { v: "dieu_hoa", t: "Điều hòa" },
+                  { v: "tu_lanh", t: "Tủ lạnh" },
+                  { v: "may_giat", t: "Máy giặt" },
+                  { v: "bep", t: "Bếp" },
+                  { v: "ban_cong", t: "Ban công" },
+                  { v: "thang_may", t: "Thang máy" },
+                  { v: "bao_ve_24_7", t: "Bảo vệ 24/7" },
+                  { v: "camera_an_ninh", t: "Camera an ninh" },
+                  { v: "internet", t: "Internet" },
+                  { v: "nuoc_nong", t: "Nước nóng" },
+                  { v: "san_thuong", t: "Sân thượng" },
+                  { v: "san_vuon", t: "Sân vườn" },
+                  { v: "ho_boi", t: "Hồ bơi" },
+                  { v: "phong_gym", t: "Phòng gym" },
+                  { v: "khu_vui_choi", t: "Khu vui chơi" },
+                  { v: "sieu_thi", t: "Siêu thị" },
+                  { v: "cho", t: "Chợ" },
+                  { v: "truong_hoc", t: "Trường học" },
+                  { v: "benh_vien", t: "Bệnh viện" },
+                  { v: "ben_xe", t: "Bến xe" },
+                  { v: "ga_tau", t: "Ga tàu" },
+                ].map(opt => {
+                  const checked = (data.amenities||[]).includes(opt.v);
+                  return (
+                    <label key={opt.v} className="flex items-center gap-2 text-sm">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" 
+                        checked={checked} 
+                        onChange={(e)=>{
+                          setData(d=>{
+                            const set = new Set(d.amenities||[]);
+                            e.target.checked ? set.add(opt.v) : set.delete(opt.v);
+                            return { ...d, amenities: Array.from(set) };
+                          });
+                        }} 
+                      />
+                      <span>{opt.t}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Phong cách sống">
             <select className="w-full px-2 py-1.5 text-sm outline-none" value={data.lifestyle ?? "quiet"} onChange={e=>setData(d=>({...d, lifestyle: e.target.value as UserProfile["lifestyle"]}))}>
@@ -276,8 +585,66 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
           <FieldBox label="Mức độ hòa đồng (1-5)">
             <input type="number" min={1} max={5} className="w-full px-2 py-1.5 text-sm outline-none" value={data.socialLevel ?? ""} onChange={e=>setData(d=>({...d, socialLevel: toNumber(e.target.value)}))} />
           </FieldBox>
+          <FieldBox className="md:col-span-2" label="Loại phòng/căn hộ quan tâm" required>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {[
+                { v: "phong_tro", t: "Phòng trọ" },
+                { v: "chung_cu", t: "Chung cư/Căn hộ" },
+                { v: "nha_nguyen_can", t: "Nhà nguyên căn" },
+                { v: "can_ho_dv", t: "Căn hộ DV" },
+                { v: "officetel", t: "Officetel" },
+                { v: "studio", t: "Studio" },
+              ].map(opt => {
+                const checked = (data.roomType||[]).includes(opt.v);
+                return (
+                  <label key={opt.v} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" checked={checked} onChange={(e)=>{
+                      setData(d=>{
+                        const set = new Set(d.roomType||[]);
+                        e.target.checked ? set.add(opt.v) : set.delete(opt.v);
+                        return { ...d, roomType: Array.from(set) };
+                      });
+                    }} />
+                    <span>{opt.t}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </FieldBox>
           <FieldBox className="md:col-span-2" label="Cách liên hệ ưa thích">
-            <input className="w-full px-2 py-1.5 text-sm outline-none" placeholder="email, phone, zalo" value={(data.contactMethod || []).join(", ")} onChange={e=>setData(d=>({...d, contactMethod: e.target.value.split(",").map(s=>s.trim())}))} />
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                "Email",
+                "Điện thoại", 
+                "Zalo",
+                "Facebook",
+                "Telegram",
+                "Viber",
+                "Skype",
+                "Discord",
+                "Instagram",
+                "TikTok",
+                "Twitter",
+                "Line"
+              ].map(method => (
+                <label key={method} className="flex items-center space-x-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={(data.contactMethod || []).includes(method)}
+                    onChange={e => {
+                      const current = data.contactMethod || [];
+                      if (e.target.checked) {
+                        setData(d => ({ ...d, contactMethod: [...current, method] }));
+                      } else {
+                        setData(d => ({ ...d, contactMethod: current.filter(m => m !== method) }));
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  <span>{method}</span>
+                </label>
+              ))}
+            </div>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Khung giờ liên hệ (ngày thường)">
             <input className="w-full px-2 py-1.5 text-sm outline-none" value={data.availableTime?.weekdays ?? ""} onChange={e=>setData(d=>({...d, availableTime: { ...(d.availableTime||{}), weekdays: e.target.value }}))} />
@@ -447,7 +814,39 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
             </div>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Cách liên hệ ưa thích">
-            <input className="w-full px-2 py-1.5 text-sm outline-none" placeholder="email, phone, zalo" value={(data.contactMethod || []).join(", ")} onChange={e=>setData(d=>({...d, contactMethod: e.target.value.split(",").map(s=>s.trim())}))} />
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                "Email",
+                "Điện thoại", 
+                "Zalo",
+                "Facebook",
+                "Telegram",
+                "Viber",
+                "Skype",
+                "Discord",
+                "Instagram",
+                "TikTok",
+                "Twitter",
+                "Line"
+              ].map(method => (
+                <label key={method} className="flex items-center space-x-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={(data.contactMethod || []).includes(method)}
+                    onChange={e => {
+                      const current = data.contactMethod || [];
+                      if (e.target.checked) {
+                        setData(d => ({ ...d, contactMethod: [...current, method] }));
+                      } else {
+                        setData(d => ({ ...d, contactMethod: current.filter(m => m !== method) }));
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  <span>{method}</span>
+                </label>
+              ))}
+            </div>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Khung giờ liên hệ (ngày thường)">
             <input className="w-full px-2 py-1.5 text-sm outline-none" value={data.availableTime?.weekdays ?? ""} onChange={e=>setData(d=>({...d, availableTime: { ...(d.availableTime||{}), weekdays: e.target.value }}))} />
@@ -459,7 +858,21 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       )}
 
       <div className="flex gap-3">
-        <button onClick={()=>{ window.location.href = "/profile/survey"; }} className="h-10 px-5 rounded-lg border border-gray-300">Trở lại</button>
+        <button 
+          onClick={() => {
+            // Nếu đang trong registration flow, quay về trang đăng ký
+            const isRegistrationFlow = typeof window !== "undefined" && localStorage.getItem("isRegistrationFlow") === "true";
+            if (isRegistrationFlow) {
+              router.push("/register");
+            } else {
+              // Nếu đang edit profile, quay về trang profile
+              router.push("/profile");
+            }
+          }} 
+          className="h-10 px-5 rounded-lg border border-gray-300"
+        >
+          Trở lại
+        </button>
         <button onClick={save} disabled={loading} className="h-10 px-5 rounded-lg bg-teal-600 text-white">{loading ? "Đang lưu..." : "Hoàn tất"}</button>
       </div>
     </div>

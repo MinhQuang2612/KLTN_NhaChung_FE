@@ -55,11 +55,36 @@ class AddressService {
 
   async getWardsByProvince(provinceCode: string): Promise<Ward[]> {
     try {
+      console.log('Fetching wards for provinceCode:', provinceCode);
       const response = await fetch(`${this.baseURL}/wards?provinceCode=${provinceCode}`);
       if (!response.ok) {
         throw new Error('Failed to fetch wards');
       }
       const data = await response.json();
+      console.log('Raw wards data:', data);
+      
+      // If no data returned, try alternative province codes for Hanoi
+      if (!data || data.length === 0) {
+        console.log('No wards found, trying alternative codes for Hanoi');
+        const alternativeCodes = ['01', '1', 'HN', 'Hanoi'];
+        for (const altCode of alternativeCodes) {
+          if (altCode !== provinceCode) {
+            try {
+              const altResponse = await fetch(`${this.baseURL}/wards?provinceCode=${altCode}`);
+              if (altResponse.ok) {
+                const altData = await altResponse.json();
+                if (altData && altData.length > 0) {
+                  console.log('Found wards with alternative code:', altCode, altData);
+                  data.push(...altData);
+                  break;
+                }
+              }
+            } catch (altError) {
+              console.log('Alternative code failed:', altCode, altError);
+            }
+          }
+        }
+      }
       
       // Remove duplicates based on wardCode and wardName
       const uniqueWards = data.reduce((acc: Ward[], current: Ward) => {
@@ -74,8 +99,11 @@ class AddressService {
       }, []);
       
       // Sort by wardName
-      return uniqueWards.sort((a: Ward, b: Ward) => a.wardName.localeCompare(b.wardName, 'vi'));
+      const sortedWards = uniqueWards.sort((a: Ward, b: Ward) => a.wardName.localeCompare(b.wardName, 'vi'));
+      console.log('Processed wards:', sortedWards);
+      return sortedWards;
     } catch (error) {
+      console.error('Error fetching wards:', error);
       return [];
     }
   }

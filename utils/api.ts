@@ -33,7 +33,7 @@ const getToken = () =>
 
 export async function api<T = any>(
   path: string,
-  init: RequestInit = {}
+  init: RequestInit & { skipAuth?: boolean } = {}
 ): Promise<T> {
   const token = getToken();
   const isFD = typeof FormData !== "undefined" && init.body instanceof FormData;
@@ -41,8 +41,13 @@ export async function api<T = any>(
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string> | undefined),
     ...(!isFD ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token && !init.skipAuth ? { Authorization: `Bearer ${token}` } : {}),
   };
+
+  // Debug logging
+  if (init.skipAuth) {
+    console.log("API call with skipAuth:", { path, headers, body: init.body });
+  }
 
   const res = await fetch(join(API_BASE, path), { ...init, headers });
 
@@ -52,9 +57,13 @@ export async function api<T = any>(
   const data = safeParse(raw);
 
   if (res.status === 401) {
+    // Chỉ xóa token nếu không phải trong registration flow
     if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      const isRegistrationFlow = localStorage.getItem("isRegistrationFlow") === "true";
+      if (!isRegistrationFlow) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
     }
     throw new ApiError(
       typeof data === "string" ? data : data?.message ?? "Unauthorized",
@@ -77,11 +86,12 @@ export async function api<T = any>(
 export const apiGet = <T = any>(p: string, o?: RequestInit) =>
   api<T>(p, { ...o, method: "GET" });
 
-export const apiPost = <T = any>(p: string, body?: any, o?: RequestInit) =>
+export const apiPost = <T = any>(p: string, body?: any, o?: RequestInit & { skipAuth?: boolean }) =>
   api<T>(p, {
     ...o,
     method: "POST",
     body: body instanceof FormData ? body : JSON.stringify(body),
+    skipAuth: o?.skipAuth,
   });
 
 export const apiPut = <T = any>(p: string, body?: any, o?: RequestInit) =>
@@ -104,13 +114,90 @@ export const apiPatch = <T = any>(p: string, body?: any, o?: RequestInit) =>
 // Helper: trích xuất thông báo lỗi thân thiện từ ApiError/Fetch error
 export function extractApiErrorMessage(err: any): string {
   if (!err) return "Đã xảy ra lỗi không xác định";
+  
+  // Nếu err là string, trả về luôn
+  if (typeof err === "string") {
+    return err;
+  }
+  
   // ApiError từ api.ts
   if (typeof err === "object" && "status" in err && (err as any).status) {
     const body = (err as any).body;
-    const msg = Array.isArray(body?.message) ? body.message.join("; ") : (body?.message ?? String(err.message ?? err.statusText ?? "Lỗi API"));
+    let msg = "";
+    
+    // Xử lý message từ body
+    if (body?.message) {
+      if (Array.isArray(body.message)) {
+        msg = body.message.join("; ");
+      } else if (typeof body.message === "string") {
+        msg = body.message;
+      } else if (typeof body.message === "object") {
+        // Nếu message là object, thử lấy các thuộc tính quan trọng
+        const messageObj = body.message;
+        if (messageObj.error) {
+          msg = messageObj.error;
+        } else if (messageObj.details) {
+          msg = messageObj.details;
+        } else {
+          msg = JSON.stringify(messageObj);
+        }
+      }
+    }
+    
+    // Fallback nếu không có message từ body
+    if (!msg) {
+      msg = err.message || err.statusText || `Lỗi ${err.status}`;
+    }
+    
     return msg;
   }
-  // Lỗi mạng
-  if (String(err?.message || "").includes("Failed to fetch")) return "Không thể kết nối máy chủ. Kiểm tra API URL hoặc mạng.";
-  return String(err?.message || err);
+  
+  // Xử lý lỗi từ fetch/network
+  if (err?.message) {
+    const message = String(err.message);
+    
+    // Lỗi mạng
+    if (message.includes("Failed to fetch")) {
+      return "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.";
+    }
+    if (message.includes("timeout")) {
+      return "Kết nối quá chậm. Vui lòng thử lại sau.";
+    }
+    if (message.includes("NetworkError")) {
+      return "Lỗi mạng. Vui lòng kiểm tra kết nối internet.";
+    }
+    
+    return message;
+  }
+  
+  // Xử lý lỗi từ response body
+  if (err?.body) {
+    const body = err.body;
+    if (typeof body === "string") {
+      return body;
+    }
+    if (typeof body === "object" && body.message) {
+      if (Array.isArray(body.message)) {
+        return body.message.join("; ");
+      }
+      return String(body.message);
+    }
+  }
+  
+  // Fallback cuối cùng
+  if (typeof err === "object") {
+    // Thử lấy các thuộc tính phổ biến
+    if (err.error) return String(err.error);
+    if (err.details) return String(err.details);
+    if (err.reason) return String(err.reason);
+    
+    // Nếu là object phức tạp, chuyển thành JSON
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "Đã xảy ra lỗi không xác định";
+    }
+  }
+  
+  return String(err);
 }

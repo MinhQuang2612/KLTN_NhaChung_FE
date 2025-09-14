@@ -31,7 +31,7 @@ export interface RoommatePost {
   };
   personalInfo: {
     fullName: string;
-    age: number;
+    dateOfBirth: string; // Format: YYYY-MM-DD
     gender: 'male' | 'female' | 'other';
     occupation: string;
     hobbies: string[];
@@ -40,7 +40,7 @@ export interface RoommatePost {
     cleanliness?: 'very_clean' | 'clean' | 'normal' | 'flexible';
   };
   requirements: {
-    ageRange: [number, number];
+    ageRange: [number, number]; // Vẫn giữ ageRange cho requirements
     gender: 'male' | 'female' | 'any';
     traits: string[];
     maxPrice: number;

@@ -11,6 +11,7 @@ import { listRoommatePosts } from "../../services/roommatePosts";
 import { RentPostApi } from "../../types/RentPostApi";
 import { RoommatePost } from "../../services/roommatePosts";
 import { addressService } from "../../services/address";
+import { AgeUtils } from "../../utils/ageUtils";
 
 // Mock data cho danh sách yêu thích
 const mockFavorites = [
@@ -238,7 +239,7 @@ export default function FavoritesPage() {
                 price: post.currentRoom.price,
                 area: post.currentRoom.area,
                 address: post.currentRoom.address,
-                owner: `${post.personalInfo.occupation}, ${post.personalInfo.age} tuổi`,
+                owner: `${post.personalInfo.occupation}, ${post.personalInfo.dateOfBirth ? AgeUtils.getAgeInfo(post.personalInfo.dateOfBirth).ageText : 'N/A'}`,
                 phone: "0123456789", // Backend chưa có
                 addedAt: fav.createdAt.split('T')[0],
                 images: post.images || ["/home/room1.png"],

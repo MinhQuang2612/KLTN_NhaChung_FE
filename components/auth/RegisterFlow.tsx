@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRegister } from "@/hooks/useRegister";
 import { resendRegistrationOtp, verifyRegistration, loginService } from "@/services/auth";
 import { extractApiErrorMessage } from "@/utils/api";
+import { ErrorMessageMapper, validateEmailFormat, validatePassword, validatePhone, validateName } from "@/utils/errorMessages";
 import { getRandomVideo } from "@/config/cloudinary";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
@@ -41,6 +42,7 @@ export default function RegisterFlow() {
     name: "",
     email: "",
     password: "",
+    confirmPassword: "",
     role: "user" as "user" | "landlord",
     phone: "",
     avatar: "",
@@ -54,12 +56,60 @@ export default function RegisterFlow() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const res = await register({ ...form });
-    if (res.success) {
-      setStep("otp");
+    
+    // Validation chi tiết từng trường
+    const nameValidation = validateName(form.name);
+    if (!nameValidation.isValid) {
+      setError(nameValidation.message!);
       return;
     }
-    setError(extractApiErrorMessage({ body: { message: res.message } }));
+
+    const emailValidation = validateEmailFormat(form.email);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.message!);
+      return;
+    }
+
+    const passwordValidation = validatePassword(form.password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.message!);
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
+    if (!form.role) {
+      setError("Vui lòng chọn vai trò");
+      return;
+    }
+
+    // Validation phone nếu có
+    const phoneValidation = validatePhone(form.phone);
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.message!);
+      return;
+    }
+    
+    try {
+      const res = await register({ ...form });
+      if (res.success) {
+        setStep("otp");
+        return;
+      }
+      
+      // Xử lý lỗi từ API với thông báo thân thiện
+      let errorMessage = extractApiErrorMessage({ body: { message: res.message } });
+      errorMessage = ErrorMessageMapper.mapRegistrationError(errorMessage);
+      setError(errorMessage);
+    } catch (e: any) {
+      // Xử lý lỗi từ exception
+      let errorMessage = extractApiErrorMessage(e);
+      errorMessage = ErrorMessageMapper.mapRegistrationError(errorMessage);
+      setError(errorMessage);
+    }
   };
 
   const onVerify = async () => {
@@ -70,16 +120,36 @@ export default function RegisterFlow() {
         setError("OTP gồm 6 chữ số");
         return;
       }
-      await verifyRegistration(form.email, otp);
-      // Sau khi verify thành công, login để có JWT cho bước survey
-      const { access_token, user } = await loginService(form.email, form.password);
+      const verifyResult = await verifyRegistration(form.email, otp);
+      
+      // Debug: Kiểm tra kết quả từ backend
+      console.log("Verify result:", verifyResult);
+      console.log("User from verify:", verifyResult.user);
+      console.log("UserId from verify:", verifyResult.user?.userId);
+      
+      // Sau khi verify thành công, lưu thông tin đăng ký với userId thật
       if (typeof window !== "undefined") {
-        localStorage.setItem("token", access_token);
-        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("registrationData", JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          phone: form.phone,
+          avatar: form.avatar,
+          userId: verifyResult.user?.userId || 0, // Lưu userId thật từ backend
+          verifiedAt: new Date().toISOString()
+        }));
+        localStorage.setItem("isRegistrationFlow", "true");
       }
-      router.push(`/profile/survey?role=${form.role}`);
+      
+      // Chuyển đến survey page
+      setTimeout(() => {
+        router.push(`/profile/survey?role=${form.role}`);
+      }, 100);
     } catch (e: any) {
-      setError(extractApiErrorMessage(e));
+      let errorMessage = extractApiErrorMessage(e);
+      errorMessage = ErrorMessageMapper.mapOtpError(errorMessage);
+      setError(errorMessage);
     }
   };
 
@@ -87,8 +157,11 @@ export default function RegisterFlow() {
     try {
       setError("");
       await resendRegistrationOtp(form.email);
+      setError("Đã gửi lại mã OTP. Vui lòng kiểm tra email.");
     } catch (e: any) {
-      setError(extractApiErrorMessage(e));
+      let errorMessage = extractApiErrorMessage(e);
+      errorMessage = ErrorMessageMapper.mapOtpError(errorMessage);
+      setError(errorMessage);
     }
   };
 
@@ -180,6 +253,19 @@ export default function RegisterFlow() {
 
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">
+                    Số điện thoại
+                  </label>
+                  <input 
+                    type="tel" 
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition-all duration-300 text-white placeholder-white/60 hover:bg-white/15" 
+                    value={form.phone} 
+                    onChange={e=>setForm(f=>({...f, phone:e.target.value}))} 
+                    placeholder="0123456789"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">
                     Mật khẩu <span className="text-red-400">*</span>
                   </label>
                   <input 
@@ -189,6 +275,24 @@ export default function RegisterFlow() {
                     onChange={e=>setForm(f=>({...f, password:e.target.value}))} 
                     placeholder="Tối thiểu 6 ký tự"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">
+                    Nhập lại mật khẩu <span className="text-red-400">*</span>
+                  </label>
+                  <input 
+                    type="password" 
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition-all duration-300 text-white placeholder-white/60 hover:bg-white/15" 
+                    value={form.confirmPassword} 
+                    onChange={e=>setForm(f=>({...f, confirmPassword:e.target.value}))} 
+                    placeholder="Nhập lại mật khẩu"
+                  />
+                  {form.confirmPassword && form.password !== form.confirmPassword && (
+                    <div className="text-red-300 text-xs mt-1">
+                      Mật khẩu không khớp
+                    </div>
+                  )}
                 </div>
 
                 <div>
