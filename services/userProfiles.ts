@@ -7,29 +7,34 @@ export interface UserProfile {
   profileId?: number;
   userId?: number;
   dateOfBirth?: string; // Format: YYYY-MM-DD
-  gender?: 'male' | 'female' | 'other';
+  gender?: string; // Raw value from FE, no enum constraint
   occupation?: string;
   income?: number;
   currentLocation?: string;
   preferredDistricts?: string[];
+  preferredWards?: string[];
+  preferredWardCodes?: string[];
   budgetRange?: BudgetRange;
   roomType?: string[];
   amenities?: string[];
-  lifestyle?: 'quiet' | 'social' | 'party' | 'study';
+  lifestyle?: string; // Raw value from FE, no enum constraint
   smoking?: boolean;
   pets?: boolean;
   cleanliness?: number;
   socialLevel?: number;
   // landlord specific
-  businessType?: 'individual' | 'company' | 'agency';
-  experience?: 'new' | '1-2_years' | '3-5_years' | '5+_years';
-  propertiesCount?: number;
+  businessType?: string; // Raw value from FE, no enum constraint
+  experience?: string; // Raw value from FE, no enum constraint
   propertyTypes?: string[];
   targetDistricts?: string[];
+  targetWards?: string[];
+  targetWardCodes?: string[];
+  targetCityCode?: string;
+  targetCityName?: string;
   priceRange?: BudgetRange;
   targetTenants?: string[];
-  managementStyle?: 'strict' | 'flexible' | 'friendly';
-  responseTime?: 'immediate' | 'within_hour' | 'within_day';
+  managementStyle?: string; // Raw value from FE, no enum constraint
+  responseTime?: string; // Raw value from FE, no enum constraint
   additionalServices?: string[];
   businessLicense?: string;
   taxCode?: string;
@@ -39,7 +44,7 @@ export interface UserProfile {
 }
 
 export function createProfile(data: UserProfile) {
-  return apiPost<UserProfile>("user-profiles", data);
+  return apiPost<UserProfile>("user-profiles/me", data);
 }
 
 // Tạo profile không cần token (cho registration flow)
@@ -70,12 +75,12 @@ export function createProfilePublicFallback(data: UserProfile & { email: string 
   });
 }
 
-export function getMyProfile(userId: number) {
-  return apiGet<UserProfile>(`user-profiles/user/${userId}`);
+export function getMyProfile() {
+  return apiGet<UserProfile>("user-profiles/me");
 }
 
-export function updateMyProfile(userId: number, data: Partial<UserProfile>) {
-  return apiPatch<UserProfile>(`user-profiles/user/${userId}`, data as any);
+export function updateMyProfile(data: Partial<UserProfile>) {
+  return apiPatch<UserProfile>("user-profiles/me", data as any);
 }
 
 

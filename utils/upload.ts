@@ -1,9 +1,13 @@
 import { API_BASE } from "./api";
 
+// Overloads để hỗ trợ gọi linh hoạt
+export async function uploadFiles(files: File[]): Promise<string[]>;
+export async function uploadFiles(files: File[], userId: number): Promise<string[]>;
+export async function uploadFiles(files: File[], userId: number, folder: "images" | "videos"): Promise<string[]>;
 export async function uploadFiles(
   files: File[],
-  userId: number,
-  folder: "images" | "videos"
+  userId?: number,
+  folder: "images" | "videos" = "images"
 ): Promise<string[]> {
   const uploadedUrls: string[] = [];
 
@@ -16,13 +20,26 @@ export async function uploadFiles(
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      body: JSON.stringify({
-        userId,
-        fileName: file.name,
-        contentType: file.type,
-        folder,
-      }),
-    }).then((r) => r.json());
+      body: JSON.stringify((() => {
+        const payload: any = {
+          fileName: file.name,
+          contentType: file.type,
+          folder,
+        };
+        if (typeof userId === "number" && userId > 0) payload.userId = userId;
+        return payload;
+      })()),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`Presign failed: ${r.status} ${text}`);
+      }
+      return r.json();
+    });
+
+    if (!presignRes?.uploadUrl || !presignRes?.publicUrl) {
+      throw new Error("Presign response invalid: missing uploadUrl/publicUrl");
+    }
 
     // 2. PUT file lên S3
     await fetch(presignRes.uploadUrl, {

@@ -21,6 +21,7 @@ export default function Header() {
     if (pathname === "/") return "trang-chu";
     if (pathname === "/find_share" || pathname.startsWith("/room_details")) return "tim-phong";
     if (pathname === "/post" || pathname === "/post/rent" || pathname === "/post/roommate") return "dang-tin";
+    if (pathname.startsWith("/landlord")) return "landlord";
     if (pathname === "/blog") return "blog";
     if (pathname === "/support") return "ho-tro";
     return "trang-chu";
@@ -198,7 +199,7 @@ export default function Header() {
 
             {/* User Dropdown Menu */}
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-sm font-medium text-gray-900">{user.name}</p>
                   <p className="text-sm text-gray-500">{user.email}</p>
@@ -221,6 +222,26 @@ export default function Header() {
                 >
                   Yêu thích
                 </Link>
+                {user.role === 'landlord' && (
+                  <>
+                    <div className="my-2 border-t border-gray-100" />
+                    <p className="px-4 pb-1 text-xs font-semibold text-gray-500 uppercase">Quản lý</p>
+                    <Link
+                      href="/landlord/buildings"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Quản lý dãy
+                    </Link>
+                    <Link
+                      href="/landlord/rooms"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Quản lý phòng
+                    </Link>
+                  </>
+                )}
                 <div className="border-t border-gray-100 mt-2 pt-2">
                   <button
                     onClick={logout}

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { createProfile, createProfilePublic, createProfilePublicFallback, getMyProfile, updateMyProfile, UserProfile } from "@/services/userProfiles";
 import AddressSelector from "@/components/common/AddressSelector";
 import { addressService, type Address, type Ward } from "@/services/address";
@@ -10,12 +9,17 @@ import { uploadFiles } from "@/utils/upload";
 import { AgeUtils } from "@/utils/ageUtils";
 import { User } from "@/types/User";
 import { loginService } from "@/services/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
   return (
     <fieldset
       className={`rounded-lg border ${className}`}
       onClick={(e) => {
+        const target = e.target as HTMLElement;
+        const tag = target.tagName;
+        const isInteractive = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || target.getAttribute("contenteditable") === "true";
+        if (isInteractive) return; // Không ép focus nếu đang click trực tiếp vào input
         const el = (e.currentTarget as HTMLElement).querySelector(
           "input, select, textarea, [contenteditable=true]"
         ) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null);
@@ -48,10 +52,15 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   const [landlordTargetWards, setLandlordTargetWards] = useState<string[]>([]);
   const [provinceOptions, setProvinceOptions] = useState<{ code: string; name: string }[]>([]);
   const [licensePreview, setLicensePreview] = useState<string>("");
+  const [licenseInputKey, setLicenseInputKey] = useState<number>(0);
+  const [licenseFileName, setLicenseFileName] = useState<string>("");
+  const [licenseUploading, setLicenseUploading] = useState<boolean>(false);
+  const licenseInputRef = useRef<HTMLInputElement | null>(null);
   // UX helpers for required hints
   const [focusedField, setFocusedField] = useState<string>("");
   // Local user state for registration flow
   const [localUser, setLocalUser] = useState<User | null>(null);
+  const DRAFT_KEY = `survey_draft_${typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('role') || role) : role}`;
 
   // helpers
   const toNumber = (v: string): number | undefined => (v === "" ? undefined : Number(v));
@@ -104,6 +113,58 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
     }
   }, []); // Empty dependency array - chỉ chạy 1 lần
 
+  // Load draft nếu có (chạy 1 lần sau mount)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw || '{}');
+        if (draft.data) setData((prev)=>({ ...prev, ...draft.data }));
+        if (draft.currentAddress) setCurrentAddress(draft.currentAddress);
+        if (Array.isArray(draft.preferredWards)) setPreferredWards(draft.preferredWards);
+        if (draft.landlordCity) setLandlordCity(draft.landlordCity);
+        if (Array.isArray(draft.landlordTargetWards)) setLandlordTargetWards(draft.landlordTargetWards);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save draft khi thay đổi
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const snapshot = {
+        data,
+        currentAddress,
+        preferredWards,
+        landlordCity,
+        landlordTargetWards,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot));
+    } catch {}
+  }, [data, currentAddress, preferredWards, landlordCity, landlordTargetWards]);
+
+  // Cảnh báo trước khi rời trang nếu đang có dữ liệu
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const hasData = !!(
+        Object.keys(data||{}).length ||
+        preferredWards.length ||
+        landlordTargetWards.length ||
+        currentAddress?.provinceCode ||
+        landlordCity?.provinceCode
+      );
+      if (hasData) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [data, preferredWards, landlordTargetWards, currentAddress?.provinceCode, landlordCity?.provinceCode]);
+
   // useEffect để load profile data khi có user
   useEffect(() => {
     const fetch = async () => {
@@ -116,7 +177,7 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       
       try {
         setLoading(true);
-        const p = await getMyProfile(currentUser.userId);
+        const p = await getMyProfile();
         setData(p || {});
         // Hydrate address line to UI (best effort)
         if (p?.currentLocation) setCurrentAddress({
@@ -126,7 +187,7 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
           provinceCode: "", provinceName: "",
           wardCode: "", wardName: ""
         } as Address);
-        if (Array.isArray(p?.preferredDistricts)) setPreferredWards(p!.preferredDistricts!);
+        if (Array.isArray((p as any)?.preferredWards)) setPreferredWards((p as any).preferredWards as string[]);
       } catch {
         setData({});
       } finally {
@@ -186,6 +247,29 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
     })();
   }, []);
 
+  // Đồng bộ preview với businessLicense nếu đã có URL từ server
+  useEffect(() => {
+    if (!licensePreview && data.businessLicense) {
+      setLicensePreview(data.businessLicense);
+    }
+  }, [data.businessLicense]);
+
+  // Helper: lấy userId ổn định để upload
+  const getStableUserId = (): number | undefined => {
+    if (user?.userId && user.userId > 0) return Number(user.userId);
+    if (localUser?.userId && localUser.userId > 0) return Number(localUser.userId);
+    if (typeof window !== "undefined") {
+      try {
+        const reg = localStorage.getItem("registrationData");
+        if (reg) {
+          const r = JSON.parse(reg);
+          if (r?.userId && Number(r.userId) > 0) return Number(r.userId);
+        }
+      } catch {}
+    }
+    return undefined;
+  };
+
   const save = async () => {
     const currentUser = localUser || user;
     
@@ -230,56 +314,66 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
     try {
       setLoading(true);
       const errs: string[] = [];
-      // Common validations for both roles
-      if (!currentAddress?.provinceCode || !currentAddress?.wardCode) {
-        errs.push("Vui lòng chọn Tỉnh/Thành phố và Phường/Xã cho khu vực đang ở");
-      }
-      if (!Array.isArray(preferredWards) || preferredWards.length === 0) {
-        errs.push("Vui lòng chọn ít nhất 1 phường ưu tiên");
-      }
-      if (!data.gender) errs.push("Vui lòng chọn giới tính");
-      if (!data.occupation || !data.occupation.trim()) errs.push("Vui lòng nhập nghề nghiệp");
-      if (data.income != null && data.income < 0) errs.push("Thu nhập không hợp lệ");
-      
-      // Validate dateOfBirth - Bắt buộc phải đủ 18 tuổi
-      if (!data.dateOfBirth) {
-        errs.push("Vui lòng nhập ngày sinh");
-      } else {
-        const dateValidation = AgeUtils.validateDateOfBirth(data.dateOfBirth);
-        if (!dateValidation.isValid) {
-          errs.push(dateValidation.message || "Ngày sinh không hợp lệ");
+      const normalizedLifestyle = role === "user" ? (data.lifestyle ?? "quiet") : data.lifestyle;
+
+      if (role === "user") {
+        // User Preferences (40% completion) - cần 1 trong nhóm preferred* + budgetRange + roomType + amenities + lifestyle
+        const hasPreferredLocation = Array.isArray(preferredWards) && preferredWards.length > 0;
+        
+        if (!hasPreferredLocation) {
+          errs.push("Vui lòng chọn ít nhất 1 khu vực ưu tiên (phường/xã)");
+        }
+        if (!data.budgetRange || data.budgetRange.min == null || data.budgetRange.max == null) {
+          errs.push("Vui lòng nhập khoảng ngân sách (tối thiểu và tối đa)");
+        } else if (data.budgetRange.min > data.budgetRange.max) {
+          errs.push("Ngân sách: tối thiểu phải nhỏ hơn hoặc bằng tối đa");
+        }
+        if (!Array.isArray(data.roomType) || data.roomType.length === 0) {
+          errs.push("Vui lòng chọn ít nhất 1 loại phòng/căn hộ quan tâm");
+        }
+        if (!Array.isArray(data.amenities) || data.amenities.length === 0) {
+          errs.push("Vui lòng chọn ít nhất 1 tiện ích mong muốn");
+        }
+        if (!normalizedLifestyle) {
+          errs.push("Vui lòng chọn phong cách sống");
+        }
+
+        // Basic (30% completion) - dateOfBirth, gender, occupation, income, currentLocation
+        if (!data.dateOfBirth) {
+          errs.push("Vui lòng nhập ngày sinh");
         } else {
-          if (!AgeUtils.isAdult(data.dateOfBirth)) {
+          const dateValidation = AgeUtils.validateDateOfBirth(data.dateOfBirth);
+          if (!dateValidation.isValid) {
+            errs.push(dateValidation.message || "Ngày sinh không hợp lệ");
+          } else if (!AgeUtils.isAdult(data.dateOfBirth)) {
             errs.push("Bạn phải đủ 18 tuổi để sử dụng dịch vụ này");
           }
         }
-      }
-      if (data.budgetRange) {
-        const { min, max } = data.budgetRange;
-        if (min != null && min < 0) errs.push("Ngân sách tối thiểu không hợp lệ");
-        if (max != null && max < 0) errs.push("Ngân sách tối đa không hợp lệ");
-        if (min != null && max != null && min > max) errs.push("Ngân sách: tối thiểu phải nhỏ hơn hoặc bằng tối đa");
-      }
-      if (!Array.isArray(data.roomType) || data.roomType.length === 0) {
-        errs.push("Vui lòng mô tả loại phòng/căn hộ quan tâm (đã hiểu được tối thiểu 1 loại)");
-      }
-      if (!Array.isArray(data.contactMethod) || data.contactMethod.length === 0) {
-        errs.push("Vui lòng nhập ít nhất 1 cách liên hệ ưa thích");
-      }
-
-      // Landlord specific validations
-      if (role === "landlord") {
-        if (!data.businessType) errs.push("Vui lòng chọn loại hình kinh doanh");
+        if (!data.gender) errs.push("Vui lòng chọn giới tính");
+        if (!data.occupation) errs.push("Vui lòng chọn đối tượng thuê");
+        if (data.income != null && data.income < 0) errs.push("Thu nhập không hợp lệ");
+        if (!currentAddress?.provinceCode) {
+          errs.push("Vui lòng chọn Thành phố để tìm trọ");
+        }
+      } else if (role === "landlord") {
+        // Landlord Role (30% completion) - cần experience + propertyTypes + priceRange + 1 trong nhóm target*
         if (!data.experience) errs.push("Vui lòng chọn kinh nghiệm");
-        if (data.propertiesCount != null && data.propertiesCount < 0) errs.push("Số bất động sản không hợp lệ");
         if (!Array.isArray(data.propertyTypes) || data.propertyTypes.length === 0) {
-          errs.push("Vui lòng nhập loại BĐS cho thuê (tối thiểu 1 loại)");
+          errs.push("Vui lòng chọn ít nhất 1 loại BĐS cho thuê");
         }
         if (!data.priceRange || data.priceRange.min == null || data.priceRange.max == null) {
           errs.push("Vui lòng nhập khoảng giá (tối thiểu và tối đa)");
-        } else if (data.priceRange.min! > data.priceRange.max!) {
+        } else if (data.priceRange.min > data.priceRange.max) {
           errs.push("Khoảng giá: tối thiểu phải nhỏ hơn hoặc bằng tối đa");
         }
+        
+        // Cần 1 trong nhóm target* (targetWards|targetWardCodes|targetDistricts|targetCityCode|targetCityName)
+        const hasTargetLocation = Array.isArray(landlordTargetWards) && landlordTargetWards.length > 0;
+        
+        if (!hasTargetLocation) {
+          errs.push("Vui lòng chọn ít nhất 1 khu vực mục tiêu (thành phố/phường/xã)");
+        }
+        // Không bắt buộc các trường Basic cho role chủ nhà theo tài liệu
       }
 
       if (errs.length > 0) {
@@ -328,59 +422,96 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
         return;
       }
       
-      const currentLocationText = currentAddress
-        ? `${currentAddress.ward || currentAddress.wardName || ""}, ${currentAddress.city || currentAddress.provinceName || ""}`.replace(/^,\s*|\s*,\s*$/g, "")
-        : data.currentLocation;
+      // Không còn gửi địa chỉ hiện tại; giữ lại text để hiển thị nội bộ nếu cần
+      const currentLocationText = undefined;
+
+      // Chuẩn hóa dữ liệu gửi lên BE (map key nếu cần)
+      const mapTargetTenantToBE = (v: string) => {
+        switch (v) {
+          case 'student': return 'sinh_vien';
+          case 'office_worker': return 'nhan_vien_vp';
+          case 'family': return 'gia_dinh';
+          case 'couple': return 'cap_doi';
+          case 'group_friends': return 'nhom_ban';
+          default: return v;
+        }
+      };
+
+      const normalizedTargetTenants = role === 'landlord'
+        ? (data.targetTenants || []).map(mapTargetTenantToBE)
+        : data.targetTenants;
+
+      // Chuẩn hóa tiện ích/dịch vụ để đồng bộ và loại key cũ
+      const validFeatureKeys = new Set<string>([
+        "wifi","internet","camera_an_ninh","bao_ve_24_7","thang_may","gym",
+        "dieu_hoa","tu_lanh","may_giat","bep","ban_cong","nuoc_nong","san_thuong",
+        "san_vuon","ho_boi","sieu_thi","cho","truong_hoc","benh_vien","ben_xe","ga_tau",
+        "bai_do_xe"
+      ]);
+
+      const normalizeFeatures = (arr?: string[]) => {
+        const mapped = (arr || []).map(k => (k === "phong_gym" ? "gym" : k));
+        const filtered = mapped.filter(k => validFeatureKeys.has(k));
+        return Array.from(new Set(filtered));
+      };
+
+      const normalizedAmenities = normalizeFeatures(data.amenities);
+      const normalizedAdditionalServices = normalizeFeatures(data.additionalServices);
+
+      // Gắn kèm tên Thành phố để phân biệt trùng tên phường ở tỉnh/thành khác nhau
+      const preferredCity = role === 'user' ? (currentAddress?.provinceName || currentAddress?.city || undefined) : undefined;
+      const targetCity = role === 'landlord' ? (landlordCity?.provinceName || landlordCity?.city || undefined) : undefined;
 
       const payload: UserProfile = {
         ...data,
+        lifestyle: normalizedLifestyle as any,
         userId: actualUser.userId,
         currentLocation: currentLocationText,
-        preferredDistricts: preferredWards,
-      };
+        // Theo role: chỉ dùng WARDS (phường) cho cả user và landlord
+        preferredWards: role === 'user' ? preferredWards : undefined,
+        targetWards: role === 'landlord' ? landlordTargetWards : undefined,
+        // Đính kèm city để BE lưu cặp (city, ward)
+        preferredCity,
+        targetCity,
+        targetTenants: normalizedTargetTenants,
+        amenities: normalizedAmenities,
+        additionalServices: normalizedAdditionalServices,
+      } as UserProfile;
 
       console.log("Creating profile with userId:", actualUser.userId);
       console.log("Is registration flow:", isRegistrationFlow);
       console.log("Payload:", payload);
       
       try {
-        if (isRegistrationFlow && actualUser.userId > 0) {
-          // Sử dụng API public cho registration flow với userId thật
-          console.log("Creating profile with public API:", payload);
-          try {
-            await createProfilePublic(payload);
-          } catch (error) {
-            console.log("Public API failed, trying fallback:", error);
-            await createProfilePublicFallback({
-              ...payload,
-              email: actualUser.email
-            });
-          }
-        } else if (isRegistrationFlow && actualUser.userId === 0) {
-          console.error("No userId found in registration flow");
-          throw new Error("Không tìm thấy userId. Vui lòng thử lại từ đầu.");
+        if (isRegistrationFlow) {
+          // Trong registration flow, profile đã được tạo sau OTP, chỉ cần update
+          console.log("Updating profile in registration flow:", payload);
+          await updateMyProfile(payload);
         } else {
-          // Sử dụng API thông thường cho user đã đăng nhập
-          console.log("Creating profile with regular API:", payload);
-          await createProfile(payload);
+          // User đã đăng nhập, thử tạo mới trước, nếu thất bại thì update
+          try {
+            console.log("Creating profile with regular API:", payload);
+            await createProfile(payload);
+          } catch (createError) {
+            console.log("Create failed, trying to update profile instead");
+            await updateMyProfile(payload);
+          }
         }
       } catch (error) {
-        console.error("Profile creation error:", error);
-        // Nếu tạo mới thất bại, thử cập nhật (chỉ cho user đã đăng nhập)
-        if (!isRegistrationFlow) {
-          console.log("Trying to update profile instead");
-          await updateMyProfile(actualUser.userId, payload);
-        } else {
-          throw new Error("Không thể tạo profile. Vui lòng thử lại.");
-        }
+        console.error("Profile operation error:", error);
+        throw new Error("Không thể lưu profile. Vui lòng thử lại.");
       }
       
       // Xóa flag đăng ký và chuyển về trang chủ
       if (typeof window !== "undefined") {
         localStorage.removeItem("isRegistrationFlow");
         localStorage.removeItem("registrationData");
+        // Xóa bản nháp sau khi lưu thành công
+        try { localStorage.removeItem(DRAFT_KEY); } catch {}
       }
       
+      // Gọi refreshUser sau khi lưu thành công để hiển thị trạng thái đăng nhập
+      try { const { refreshUser } = (await import("@/contexts/AuthContext")).useAuth(); await (refreshUser?.()); } catch {}
       // Sử dụng router.push thay vì window.location.href để giữ state
       router.push("/");
     } catch (e: any) {
@@ -430,59 +561,25 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
               <option value="other">Khác</option>
             </select>
           </FieldBox>
-          <FieldBox className="md:col-span-2" label="Nghề nghiệp">
-            <select className="w-full px-2 py-1.5 text-sm outline-none" value={data.occupation ?? ""} onChange={e=>setData(d=>({...d, occupation: e.target.value }))}>
-              <option value="" disabled>Chọn nghề nghiệp</option>
-              <option value="sinh_vien">Sinh viên</option>
-              <option value="hoc_sinh">Học sinh</option>
-              <option value="nhan_vien_van_phong">Nhân viên văn phòng</option>
-              <option value="hanh_chinh">Hành chính</option>
-              <option value="ca_dem">Ca đêm</option>
-              <option value="tu_do">Tự do</option>
-              <option value="kinh_doanh">Kinh doanh</option>
-              <option value="giao_vien">Giáo viên</option>
-              <option value="bac_si">Bác sĩ</option>
-              <option value="ky_su">Kỹ sư</option>
-              <option value="luat_su">Luật sư</option>
-              <option value="thiet_ke">Thiết kế</option>
-              <option value="marketing">Marketing</option>
-              <option value="it">IT/Công nghệ thông tin</option>
-              <option value="ngan_hang">Ngân hàng</option>
-              <option value="ban_hang">Bán hàng</option>
-              <option value="dich_vu">Dịch vụ</option>
-              <option value="nong_nghiep">Nông nghiệp</option>
-              <option value="cong_nhan">Công nhân</option>
-              <option value="tai_xe">Tài xế</option>
-              <option value="dau_bep">Đầu bếp</option>
-              <option value="tho_lam_toc">Thợ làm tóc</option>
-              <option value="tho_sua_chua">Thợ sửa chữa</option>
-              <option value="tho_dien">Thợ điện</option>
-              <option value="tho_ong_nuoc">Thợ ống nước</option>
-              <option value="bao_ve">Bảo vệ</option>
-              <option value="lau_don">Lau dọn</option>
-              <option value="giao_hang">Giao hàng</option>
-              <option value="shipper">Shipper</option>
-              <option value="grab_uber">Grab/Uber</option>
-              <option value="youtuber">YouTuber</option>
-              <option value="streamer">Streamer</option>
-              <option value="freelancer">Freelancer</option>
-              <option value="thu_ky">Thư ký</option>
-              <option value="ke_toan">Kế toán</option>
-              <option value="nhan_su">Nhân sự</option>
-              <option value="ban_giam_doc">Ban giám đốc</option>
-              <option value="quan_ly">Quản lý</option>
-              <option value="giam_doc">Giám đốc</option>
-              <option value="chu_tich">Chủ tịch</option>
-              <option value="nghi_huu">Nghỉ hưu</option>
-              <option value="that_nghiep">Thất nghiệp</option>
-              <option value="khac">Khác</option>
+          <FieldBox className="md:col-span-2" label="Thuê cho">
+            <select
+              className="w-full px-2 py-1.5 text-sm outline-none"
+              value={data.occupation ?? ""}
+              onChange={e=>setData(d=>({ ...d, occupation: e.target.value }))}
+            >
+              <option value="">-- Chọn đối tượng --</option>
+              <option value="student">Sinh viên</option>
+              <option value="office_worker">Nhân viên VP</option>
+              <option value="family">Gia đình</option>
+              <option value="couple">Cặp đôi</option>
+              <option value="group_friends">Nhóm bạn</option>
             </select>
           </FieldBox>
           <FieldBox label="Thu nhập (ước tính)">
             <input type="number" className="w-full px-2 py-1.5 text-sm outline-none" value={data.income ?? ""} onChange={e=>setData(d=>({...d, income: toNumber(e.target.value)}))} />
           </FieldBox>
-          <FieldBox className="md:col-span-2" label="Khu vực đang ở">
-            <AddressSelector value={currentAddress} onChange={setCurrentAddress} fields={{ street: false, specificAddress: false, additionalInfo: false, preview: false }} />
+          <FieldBox className="md:col-span-2" label="Thành phố để tìm trọ">
+            <AddressSelector value={currentAddress} onChange={setCurrentAddress} fields={{ street: false, specificAddress: false, additionalInfo: false, preview: false, ward: false }} />
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Khu vực ưu tiên (nhiều)">
             <div className="max-h-56 overflow-auto rounded-lg p-2 grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -528,7 +625,6 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
                   { v: "san_thuong", t: "Sân thượng" },
                   { v: "san_vuon", t: "Sân vườn" },
                   { v: "ho_boi", t: "Hồ bơi" },
-                  { v: "phong_gym", t: "Phòng gym" },
                   { v: "khu_vui_choi", t: "Khu vui chơi" },
                   { v: "sieu_thi", t: "Siêu thị" },
                   { v: "cho", t: "Chợ" },
@@ -672,9 +768,7 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
               <option value="5+_years">5+ năm</option>
             </select>
           </FieldBox>
-          <FieldBox label="Số bất động sản">
-            <input type="number" className="w-full px-2 py-1.5 text-sm outline-none" value={data.propertiesCount ?? ""} onChange={e=>setData(d=>({...d, propertiesCount: toNumber(e.target.value)}))} />
-          </FieldBox>
+          {/* Bỏ trường Số bất động sản theo yêu cầu */}
           <FieldBox className="md:col-span-2" label="Thành phố mục tiêu" required>
             <select className="w-full px-2 py-1.5 text-sm outline-none" value={landlordCity?.provinceCode || ""} onChange={(e) => {
               const code = e.target.value;
@@ -736,11 +830,11 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
           <FieldBox className="md:col-span-2" label="Đối tượng khách thuê mục tiêu">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {[
-                { v: "sinh_vien", t: "Sinh viên" },
-                { v: "gia_dinh", t: "Gia đình" },
-                { v: "nhan_vien_vp", t: "Nhân viên VP" },
-                { v: "cap_doi", t: "Cặp đôi" },
-                { v: "nhom_ban", t: "Nhóm bạn" },
+                { v: "student", t: "Sinh viên" },
+                { v: "family", t: "Gia đình" },
+                { v: "office_worker", t: "Nhân viên VP" },
+                { v: "couple", t: "Cặp đôi" },
+                { v: "group_friends", t: "Nhóm bạn" },
               ].map(opt => {
                 const checked = (data.targetTenants||[]).includes(opt.v);
                 return (
@@ -772,47 +866,160 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
               <option value="within_day">Trong ngày</option>
             </select>
           </FieldBox>
-          <FieldBox className="md:col-span-2" label="Dịch vụ bổ sung">
-            <input className="w-full px-2 py-1.5 text-sm outline-none" placeholder="vệ sinh, bảo trì, quản lý tòa nhà" value={(data.additionalServices || []).join(", ")} onChange={e=>setData(d=>({...d, additionalServices: e.target.value.split(",").map(s=>s.trim())}))} />
+          <FieldBox className="md:col-span-2" label="Tiện ích/Dịch vụ cung cấp (dùng cho matching)">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {[
+                // Đồng bộ với amenities của người thuê để matching 1-1
+                { v: "wifi", t: "Wifi" },
+                { v: "internet", t: "Internet" },
+                { v: "camera_an_ninh", t: "Camera an ninh" },
+                { v: "bao_ve_24_7", t: "Bảo vệ 24/7" },
+                { v: "thang_may", t: "Thang máy" },
+                { v: "gym", t: "Gym" },
+                { v: "dieu_hoa", t: "Điều hòa" },
+                { v: "tu_lanh", t: "Tủ lạnh" },
+                { v: "may_giat", t: "Máy giặt" },
+                { v: "bep", t: "Bếp" },
+                { v: "ban_cong", t: "Ban công" },
+                { v: "nuoc_nong", t: "Nước nóng" },
+                { v: "san_thuong", t: "Sân thượng" },
+                { v: "san_vuon", t: "Sân vườn" },
+                { v: "ho_boi", t: "Hồ bơi" },
+                { v: "sieu_thi", t: "Siêu thị" },
+                { v: "cho", t: "Chợ" },
+                { v: "truong_hoc", t: "Trường học" },
+                { v: "benh_vien", t: "Bệnh viện" },
+                { v: "ben_xe", t: "Bến xe" },
+                { v: "ga_tau", t: "Ga tàu" },
+                { v: "bai_do_xe", t: "Bãi đỗ xe" },
+              ].map(opt => {
+                const checked = (data.additionalServices||[]).includes(opt.v);
+                return (
+                  <label key={opt.v} className="flex items-center gap-2 text-sm">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" 
+                      checked={checked} 
+                      onChange={(e)=>{
+                        setData(d=>{
+                          const set = new Set(d.additionalServices||[]);
+                          e.target.checked ? set.add(opt.v) : set.delete(opt.v);
+                          return { ...d, additionalServices: Array.from(set) };
+                        });
+                      }} 
+                    />
+                    <span>{opt.t}</span>
+                  </label>
+                );
+              })}
+            </div>
           </FieldBox>
           <FieldBox className="md:col-span-2" label="Giấy phép kinh doanh (ảnh)" required>
-            <input type="file" accept="image/*" className="w-full text-sm" onChange={async (e)=>{
-              const file = e.target.files?.[0];
-              if (!file || !user?.userId) return;
-              try {
-                setLoading(true);
-                const tmpUrl = URL.createObjectURL(file);
-                setLicensePreview(tmpUrl);
-                const [url] = await uploadFiles([file], Number(user.userId), "images");
-                setData(d=>({ ...d, businessLicense: url }));
-              } finally { setLoading(false); }
-            }} />
+            <input
+              ref={licenseInputRef}
+              key={licenseInputKey}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e)=>{
+                const input = e.target as HTMLInputElement;
+                const file = input.files?.[0];
+                // Nếu bấm hủy, không làm gì và giữ nguyên preview cũ
+                if (!file) { input.value = ""; return; }
+                try {
+                  // Hiển thị preview tạm thời ngay lập tức
+                  const tmpUrl = URL.createObjectURL(file);
+                  setLicensePreview(tmpUrl);
+                  setLicenseFileName(file.name);
+                  setLicenseUploading(true);
+                  setLoading(true);
+                  // Upload và thay preview bằng URL thật khi xong
+                  const uid = getStableUserId();
+                  const [url] = uid && uid > 0
+                    ? await uploadFiles([file], uid, "images")
+                    : await uploadFiles([file]);
+                  setData(d=>({ ...d, businessLicense: url }));
+                  setLicensePreview(url);
+                  // Giải phóng blob tạm
+                  try { URL.revokeObjectURL(tmpUrl); } catch {}
+                } catch (err: any) {
+                  // Giữ preview tạm, có thể thông báo lỗi nếu cần
+                  console.error("Upload business license failed", err);
+                  const msg = (err && typeof err.message === 'string') ? err.message : 'Tải ảnh thất bại. Vui lòng thử lại.';
+                  setError(msg);
+                } finally {
+                  setLoading(false);
+                  setLicenseUploading(false);
+                  // Reset để có thể chọn lại cùng một file lần nữa
+                  input.value = "";
+                  setLicenseInputKey(k => k + 1);
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="inline-flex items-center px-3 py-1.5 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
+              onClick={() => {
+                try { if (licenseInputRef.current) licenseInputRef.current.click(); } catch {}
+              }}
+            >
+              {licenseUploading ? "Đang chọn/đang tải..." : "Chọn ảnh"}
+            </button>
             {(licensePreview || data.businessLicense) && (
               <div className="mt-2 p-2 border rounded-lg">
                 <img src={data.businessLicense || licensePreview} alt="Giấy phép" className="max-h-40 object-contain mx-auto" />
               </div>
             )}
+            {(licenseFileName || licenseUploading) && (
+              <div className="mt-2 text-xs text-gray-600">
+                {licenseFileName && <span>Tệp: {licenseFileName} · </span>}
+                {licenseUploading ? <span className="text-amber-600">Đang tải lên...</span> : (data.businessLicense ? <span className="text-green-600">Đã tải xong</span> : null)}
+              </div>
+            )}
           </FieldBox>
-          <FieldBox className="md:col-span-2" label="Thông tin ngân hàng">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <select className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" value={data.bankAccount?.bankName ?? ""} onChange={e=>setData(d=>({
-                ...d,
-                bankAccount: { bankName: e.target.value, accountNumber: d.bankAccount?.accountNumber ?? "", accountHolder: d.bankAccount?.accountHolder ?? "" }
-              }))}>
-                <option value="">-- Chọn --</option>
-                {["Vietcombank","VietinBank","BIDV","Agribank","Techcombank","MB Bank","ACB","Sacombank","VPBank","TPBank","HDBank","SHB","VIB"].map(b => <option key={b} value={b}>{b}</option>)}
-                <option value="Khác">Khác</option>
-              </select>
-              <input className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" value={data.bankAccount?.accountNumber ?? ""} onChange={e=>setData(d=>({
-                ...d,
-                bankAccount: { bankName: d.bankAccount?.bankName ?? "", accountNumber: e.target.value, accountHolder: d.bankAccount?.accountHolder ?? "" }
-              }))} />
-              <input className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" value={data.bankAccount?.accountHolder ?? ""} onChange={e=>setData(d=>({
-                ...d,
-                bankAccount: { bankName: d.bankAccount?.bankName ?? "", accountNumber: d.bankAccount?.accountNumber ?? "", accountHolder: e.target.value }
-              }))} />
+          {/* Thông tin ngân hàng (fieldset riêng, không auto-focus) */}
+          <fieldset 
+            className="md:col-span-2 rounded-lg border"
+            onMouseDown={(e)=>e.stopPropagation()}
+            onClick={(e)=>e.stopPropagation()}
+          >
+            <legend className="px-2 ml-2 text-sm text-gray-700">Thông tin ngân hàng</legend>
+            <div className="px-3 pb-3 pt-0.5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <select className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" value={data.bankAccount?.bankName ?? ""} onChange={e=>setData(d=>({
+                  ...d,
+                  bankAccount: { bankName: e.target.value, accountNumber: d.bankAccount?.accountNumber ?? "", accountHolder: d.bankAccount?.accountHolder ?? "" }
+                }))}>
+                  <option value="">-- Chọn ngân hàng --</option>
+                  {["Vietcombank","VietinBank","BIDV","Agribank","Techcombank","MB Bank","ACB","Sacombank","VPBank","TPBank","HDBank","SHB","VIB"].map(b => <option key={b} value={b}>{b}</option>)}
+                  <option value="Khác">Khác</option>
+                </select>
+                <input 
+                  className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" 
+                  value={data.bankAccount?.accountNumber ?? ""} 
+                  onChange={e=>setData(d=>({
+                    ...d,
+                    bankAccount: { bankName: d.bankAccount?.bankName ?? "", accountNumber: e.target.value, accountHolder: d.bankAccount?.accountHolder ?? "" }
+                  }))}
+                  placeholder={data.bankAccount?.bankName ? "Số tài khoản" : "Chọn ngân hàng trước"}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  disabled={!data.bankAccount?.bankName}
+                />
+                <input 
+                  className="w-full px-2 py-1.5 text-sm outline-none border rounded-lg" 
+                  value={data.bankAccount?.accountHolder ?? ""} 
+                  onChange={e=>setData(d=>({
+                    ...d,
+                    bankAccount: { bankName: d.bankAccount?.bankName ?? "", accountNumber: d.bankAccount?.accountNumber ?? "", accountHolder: e.target.value }
+                  }))}
+                  placeholder={data.bankAccount?.bankName ? "Chủ tài khoản" : "Chọn ngân hàng trước"}
+                  autoComplete="name"
+                  disabled={!data.bankAccount?.bankName}
+                />
+              </div>
             </div>
-          </FieldBox>
+          </fieldset>
           <FieldBox className="md:col-span-2" label="Cách liên hệ ưa thích">
             <div className="grid grid-cols-2 gap-2">
               {[
