@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Pagination from "../common/Pagination";
 import { Building } from "../../types/Building";
 import { addressService } from "../../services/address";
+import BuildingCard from "./BuildingCard";
 
 interface BuildingsContentProps {
   buildings: Building[];
@@ -115,19 +116,7 @@ export default function BuildingsContent({
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-600 text-sm font-medium">Tổng tầng</p>
-              <p className="text-3xl font-bold text-purple-700">
-                {buildings.reduce((sum, b) => sum + b.totalFloors, 0)}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🏗️</span>
-            </div>
-          </div>
-        </div>
+        {/* Bỏ thẻ tổng tầng theo schema mới */}
       </div>
 
       {/* Main Content */}
@@ -189,86 +178,13 @@ export default function BuildingsContent({
             </div>
           ) : (
             buildings.map((building) => (
-              <div key={building.buildingId} className="p-6 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start gap-4">
-                  {/* Image */}
-                  <div className="flex-shrink-0">
-                    <img
-                      src={building.images[0] || '/home/room1.png'}
-                      alt={building.name}
-                      className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                    />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold text-gray-900">
-                            {building.name}
-                          </h3>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getBuildingTypeColor(building.buildingType)}`}>
-                            {getBuildingTypeText(building.buildingType)}
-                          </span>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                            building.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {building.isActive ? 'Hoạt động' : 'Tạm dừng'}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
-                          <span className="flex items-center gap-1">
-                            📍 {formatAddress(building.address)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            🏠 {building.totalRooms} phòng
-                          </span>
-                          <span className="flex items-center gap-1">
-                            🏗️ {building.totalFloors} tầng
-                          </span>
-                        </div>
-
-                        {building.description && (
-                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                            {building.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>📅 Tạo ngày: {formatDate(building.createdAt)}</span>
-                          <span>🔄 Cập nhật: {formatDate(building.updatedAt)}</span>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex-shrink-0">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => onView(building.buildingId)}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                          >
-                            Xem chi tiết
-                          </button>
-                          <button
-                            onClick={() => onEdit(building.buildingId)}
-                            className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            Chỉnh sửa
-                          </button>
-                          <button
-                            onClick={() => onDelete(building.buildingId)}
-                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <BuildingCard
+                key={building.buildingId}
+                building={building}
+                onClick={onView}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
             ))
           )}
         </div>

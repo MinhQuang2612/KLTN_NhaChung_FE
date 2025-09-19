@@ -174,41 +174,38 @@ export default function BuildingsPage() {
         )}
       </div>
 
-      {/* Create Modal inline để không rời trang */}
+      {/* Create Modal inline: hiển thị trực tiếp form, không khung bao ngoài */}
       {showCreate && (
         <div className="fixed inset-0 z-[100]">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreate(false)} />
+          <div className="absolute inset-0 bg-black/40 z-0" onClick={() => setShowCreate(false)} />
+          <button
+            onClick={() => setShowCreate(false)}
+            aria-label="Đóng"
+            className="absolute top-4 right-4 h-9 w-9 grid place-items-center rounded-full bg-white/90 text-gray-700 shadow hover:bg-white z-10"
+            title="Đóng"
+          >
+            ×
+          </button>
           <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-auto">
-              <div className="px-6 py-4 border-b flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Tạo dãy mới</h2>
-                <button
-                  onClick={() => setShowCreate(false)}
-                  className="h-8 w-8 grid place-items-center rounded-full bg-red-50 text-red-600 hover:bg-red-100"
-                  aria-label="Đóng"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="p-6">
-                <BuildingForm
-                  onSubmit={async (data) => {
-                    try {
-                      setLoading(true);
-                      await createBuilding(data as any);
-                      setShowCreate(false);
-                      await loadBuildings(currentPage, searchQuery);
-                    } catch (err) {
-                      console.error(err);
-                      setError("Không thể tạo dãy. Vui lòng thử lại.");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  onCancel={() => setShowCreate(false)}
-                  loading={loading}
-                />
-              </div>
+            {/* Render form trực tiếp, bản thân form đã có khung/tiêu đề riêng */}
+            <div className="max-w-5xl w-full max-h-[92vh] overflow-auto relative z-10">
+              <BuildingForm
+                onSubmit={async (data) => {
+                  try {
+                    setLoading(true);
+                    await createBuilding(data as any);
+                    setShowCreate(false);
+                    await loadBuildings(currentPage, searchQuery);
+                  } catch (err) {
+                    console.error(err);
+                    setError("Không thể tạo dãy. Vui lòng thử lại.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                onCancel={() => setShowCreate(false)}
+                loading={loading}
+              />
             </div>
           </div>
         </div>

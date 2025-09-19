@@ -28,7 +28,7 @@ export default function CreateBuildingPage() {
       setError(null);
       
       await createBuilding(data);
-      router.push("/landlord/service/housing");
+      router.push("/landlord/buildings");
     } catch (err: any) {
       setError(err.message || "Có lỗi xảy ra khi tạo dãy. Vui lòng thử lại.");
     } finally {

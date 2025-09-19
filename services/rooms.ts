@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from "@/utils/api";
+import { apiGet, apiPost, apiPut, apiDel } from "@/utils/api";
 import { 
   Room, 
   CreateRoomPayload, 
@@ -15,6 +15,8 @@ export async function getRooms(params: RoomListParams = {}): Promise<RoomListRes
   if (params.page) searchParams.append('page', params.page.toString());
   if (params.limit) searchParams.append('limit', params.limit.toString());
   if (params.search) searchParams.append('search', params.search);
+  // Include thông tin building
+  searchParams.append('include', 'building');
   
   const queryString = searchParams.toString();
   return apiGet(`landlord/rooms${queryString ? `?${queryString}` : ''}`);
@@ -22,7 +24,7 @@ export async function getRooms(params: RoomListParams = {}): Promise<RoomListRes
 
 // Lấy chi tiết phòng
 export async function getRoomById(id: number): Promise<Room> {
-  return apiGet(`landlord/rooms/${id}`);
+  return apiGet(`landlord/rooms/${id}?include=building`);
 }
 
 // Tạo phòng mới
@@ -37,7 +39,7 @@ export async function updateRoom(id: number, payload: UpdateRoomPayload): Promis
 
 // Xóa phòng (soft delete)
 export async function deleteRoom(id: number): Promise<{ message: string }> {
-  return apiDelete(`landlord/rooms/${id}`);
+  return apiDel(`landlord/rooms/${id}`);
 }
 
 // Upload hình ảnh phòng

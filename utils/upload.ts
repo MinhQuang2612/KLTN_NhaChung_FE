@@ -14,6 +14,19 @@ export async function uploadFiles(
   for (const file of files) {
     // 1. Xin presigned URL từ BE
     const token = localStorage.getItem("token");
+    // Lấy userId hiệu lực: ưu tiên tham số, fallback từ localStorage.user
+    let effectiveUserId: number | undefined = userId;
+    if ((!effectiveUserId || effectiveUserId <= 0) && typeof window !== 'undefined') {
+      try {
+        const u = localStorage.getItem('user');
+        if (u) {
+          const parsed = JSON.parse(u);
+          if (parsed && typeof parsed.userId === 'number' && parsed.userId > 0) {
+            effectiveUserId = parsed.userId;
+          }
+        }
+      } catch {}
+    }
     const presignRes = await fetch(`${API_BASE}/files/presign`, {
       method: "POST",
       headers: {
@@ -26,7 +39,7 @@ export async function uploadFiles(
           contentType: file.type,
           folder,
         };
-        if (typeof userId === "number" && userId > 0) payload.userId = userId;
+        if (typeof effectiveUserId === "number" && effectiveUserId > 0) payload.userId = effectiveUserId;
         return payload;
       })()),
     }).then(async (r) => {

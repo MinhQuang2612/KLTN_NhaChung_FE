@@ -57,14 +57,8 @@ export async function api<T = any>(
   const data = safeParse(raw);
 
   if (res.status === 401) {
-    // Chỉ xóa token nếu không phải trong registration flow
-    if (typeof window !== "undefined") {
-      const isRegistrationFlow = localStorage.getItem("isRegistrationFlow") === "true";
-      if (!isRegistrationFlow) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-      }
-    }
+    // Không tự động xóa token ở đây để tránh UI bị đá khỏi phiên khi gặp 401 do thiếu quyền.
+    // Trang gọi API sẽ tự quyết định xử lý (redirect/login/thông báo...).
     throw new ApiError(
       typeof data === "string" ? data : data?.message ?? "Unauthorized",
       401,

@@ -85,6 +85,18 @@ export default function RoomForm({
   const [mediaItems, setMediaItems] = useState<LocalMediaItem[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Hiển thị giá trị number dạng chuỗi để cho phép xoá trống tạm thời
+  const [numInputs, setNumInputs] = useState<Record<string, string>>({
+    floor: String(formData.floor ?? 1),
+    area: String(formData.area ?? 0),
+    price: String(formData.price ?? 0),
+    deposit: String(formData.deposit ?? 0),
+    bedrooms: String(formData.bedrooms ?? 1),
+    bathrooms: String(formData.bathrooms ?? 1),
+    maxOccupancy: String(formData.maxOccupancy ?? 1),
+    sharePrice: formData.sharePrice ? String(formData.sharePrice) : "",
+  });
+
   // mediaItems chỉ chứa file local mới chọn; ảnh đã có sẽ hiển thị riêng qua extraTop
 
   // Update building info when building changes
@@ -105,6 +117,19 @@ export default function RoomForm({
       }));
     }
   }, [formData.buildingId, buildings]);
+
+  const setNumberDisplay = (field: keyof typeof numInputs, value: string) => {
+    setNumInputs((p) => ({ ...p, [field]: value }));
+  };
+
+  const commitNumber = (field: keyof typeof numInputs, parse: (s: string) => number, min?: number) => {
+    const raw = numInputs[field];
+    if (raw === "" || raw === null || raw === undefined) return; // giữ trống, user sẽ nhập tiếp
+    let v = parse(raw);
+    if (Number.isNaN(v)) return; // bỏ qua nếu không hợp lệ
+    if (typeof min === "number" && v < min) v = min;
+    handleInputChange(field as string, v);
+  };
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -214,12 +239,40 @@ export default function RoomForm({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Basic Information */}
-        <div className="px-6 py-6 border-b border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Thông tin cơ bản</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Trái: Ảnh/Video */}
+          <div className="lg:col-span-1 p-6 border-r border-gray-100">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Hình ảnh</h2>
+            <MediaPickerPanel
+              mediaItems={mediaItems}
+              onMediaChange={handleMediaChange}
+              maxImages={10}
+              maxVideos={0}
+              extraTop={
+                Array.isArray(formData.images) && formData.images.length > 0 ? (
+                  <div className="mb-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      {formData.images.map((imgUrl, idx) => (
+                        <div key={`existing-${idx}`} className="relative rounded-2xl overflow-hidden border bg-white">
+                          <div className="relative pb-[133%]">
+                            <img src={imgUrl} className="absolute inset-0 w-full h-full object-cover" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              }
+            />
+            {errors.images && <p className="mt-2 text-sm text-red-600">{errors.images}</p>}
+          </div>
+
+          {/* Phải: Các trường thông tin */}
+          <div className="lg:col-span-2 p-6 space-y-8">
+            <h2 className="text-xl font-semibold text-gray-900">Thông tin phòng</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Building Selection */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,6 +284,7 @@ export default function RoomForm({
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
                   errors.buildingId ? "border-red-300" : "border-gray-300"
                 }`}
+                disabled={!!initialData?.buildingId}
               >
                 <option value={0}>Chọn dãy nhà</option>
                 {buildings.map(building => (
@@ -267,8 +321,9 @@ export default function RoomForm({
               <input
                 type="number"
                 min="1"
-                value={formData.floor}
-                onChange={(e) => handleInputChange("floor", parseInt(e.target.value))}
+                value={numInputs.floor}
+                onChange={(e) => setNumberDisplay("floor", e.target.value)}
+                onBlur={() => commitNumber("floor", (s) => parseInt(s, 10), 1)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
@@ -282,8 +337,9 @@ export default function RoomForm({
                 type="number"
                 min="1"
                 step="0.1"
-                value={formData.area}
-                onChange={(e) => handleInputChange("area", parseFloat(e.target.value))}
+                value={numInputs.area}
+                onChange={(e) => setNumberDisplay("area", e.target.value)}
+                onBlur={() => commitNumber("area", (s) => parseFloat(s), 1)}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
                   errors.area ? "border-red-300" : "border-gray-300"
                 }`}
@@ -299,8 +355,9 @@ export default function RoomForm({
               <input
                 type="number"
                 min="0"
-                value={formData.price}
-                onChange={(e) => handleInputChange("price", parseInt(e.target.value))}
+                value={numInputs.price}
+                onChange={(e) => setNumberDisplay("price", e.target.value)}
+                onBlur={() => commitNumber("price", (s) => parseInt(s, 10), 0)}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
                   errors.price ? "border-red-300" : "border-gray-300"
                 }`}
@@ -316,128 +373,22 @@ export default function RoomForm({
               <input
                 type="number"
                 min="0"
-                value={formData.deposit}
-                onChange={(e) => handleInputChange("deposit", parseInt(e.target.value))}
+                value={numInputs.deposit}
+                onChange={(e) => setNumberDisplay("deposit", e.target.value)}
+                onBlur={() => commitNumber("deposit", (s) => parseInt(s, 10), 0)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
-        </div>
-
+        
         {/* Room Details */}
-        <div className="px-6 py-6 border-b border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Chi tiết phòng</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Bedrooms */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số phòng ngủ <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.bedrooms}
-                onChange={(e) => handleInputChange("bedrooms", parseInt(e.target.value))}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
-                  errors.bedrooms ? "border-red-300" : "border-gray-300"
-                }`}
-              />
-              {errors.bedrooms && <p className="mt-1 text-sm text-red-600">{errors.bedrooms}</p>}
-            </div>
-
-            {/* Bathrooms */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số phòng tắm <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.bathrooms}
-                onChange={(e) => handleInputChange("bathrooms", parseInt(e.target.value))}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
-                  errors.bathrooms ? "border-red-300" : "border-gray-300"
-                }`}
-              />
-              {errors.bathrooms && <p className="mt-1 text-sm text-red-600">{errors.bathrooms}</p>}
-            </div>
-
-            {/* Furniture */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nội thất
-              </label>
-              <select
-                value={formData.furniture}
-                onChange={(e) => handleInputChange("furniture", e.target.value as FurnitureType)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                {FURNITURE_OPTIONS.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Direction */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Hướng
-              </label>
-              <select
-                value={formData.direction}
-                onChange={(e) => handleInputChange("direction", e.target.value as DirectionType)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                {DIRECTION_OPTIONS.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Legal Status */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tình trạng pháp lý
-              </label>
-              <select
-                value={formData.legalStatus}
-                onChange={(e) => handleInputChange("legalStatus", e.target.value as LegalStatusType)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                {LEGAL_STATUS_OPTIONS.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Max Occupancy */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số người tối đa <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.maxOccupancy}
-                onChange={(e) => handleInputChange("maxOccupancy", parseInt(e.target.value))}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
-                  errors.maxOccupancy ? "border-red-300" : "border-gray-300"
-                }`}
-              />
-              {errors.maxOccupancy && <p className="mt-1 text-sm text-red-600">{errors.maxOccupancy}</p>}
-            </div>
-          </div>
+        <div className="border-t border-gray-100 pt-6 space-y-6">
+          <h2 className="text-lg font-semibold text-gray-900">Chi tiết phòng</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6" />
         </div>
 
         {/* Sharing Options */}
-        <div className="px-6 py-6 border-b border-gray-100">
+        <div className="border-t border-gray-100 pt-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Tùy chọn ở ghép</h2>
           
           <div className="space-y-4">
@@ -462,8 +413,9 @@ export default function RoomForm({
                 <input
                   type="number"
                   min="0"
-                  value={formData.sharePrice || 0}
-                  onChange={(e) => handleInputChange("sharePrice", parseInt(e.target.value))}
+                  value={numInputs.sharePrice}
+                  onChange={(e) => setNumberDisplay("sharePrice", e.target.value)}
+                  onBlur={() => commitNumber("sharePrice", (s) => parseInt(s, 10), 0)}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent ${
                     errors.sharePrice ? "border-red-300" : "border-gray-300"
                   }`}
@@ -475,7 +427,7 @@ export default function RoomForm({
         </div>
 
         {/* Address Information */}
-        <div className="px-6 py-6 border-b border-gray-100">
+        <div className="border-t border-gray-100 pt-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Thông tin địa chỉ</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -490,6 +442,7 @@ export default function RoomForm({
                 onChange={(e) => handleAddressChange("street", e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 placeholder="Nhập tên đường"
+                disabled
               />
             </div>
 
@@ -504,6 +457,7 @@ export default function RoomForm({
                 onChange={(e) => handleAddressChange("specificAddress", e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 placeholder="Số nhà, tên đường..."
+                disabled
               />
             </div>
 
@@ -518,41 +472,14 @@ export default function RoomForm({
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 placeholder="Hướng dẫn đường đi, địa điểm nổi bật gần đó..."
+                disabled
               />
             </div>
           </div>
         </div>
 
-        {/* Images */}
-        <div className="px-6 py-6 border-b border-gray-100">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Hình ảnh</h2>
-          
-          <MediaPickerPanel
-            mediaItems={mediaItems}
-            onMediaChange={handleMediaChange}
-            maxImages={10}
-            maxVideos={0}
-            extraTop={
-              Array.isArray(formData.images) && formData.images.length > 0 ? (
-                <div className="mb-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    {formData.images.map((imgUrl, idx) => (
-                      <div key={`existing-${idx}`} className="relative rounded-2xl overflow-hidden border bg-white">
-                        <div className="relative pb-[133%]">
-                          <img src={imgUrl} className="absolute inset-0 w-full h-full object-cover" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null
-            }
-          />
-          {errors.images && <p className="mt-2 text-sm text-red-600">{errors.images}</p>}
-        </div>
-
         {/* Description */}
-        <div className="px-6 py-6">
+        <div className="border-t border-gray-100 pt-6 px-6 pb-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Mô tả</h2>
           
           <div>
@@ -587,6 +514,9 @@ export default function RoomForm({
               {loading || uploading ? "Đang xử lý..." : "Lưu phòng"}
             </button>
           </div>
+        </div>
+        {/* Đóng panel phải và grid tổng */}
+        </div>
         </div>
       </form>
     </div>

@@ -227,11 +227,25 @@ export default function Header() {
                     <div className="my-2 border-t border-gray-100" />
                     <p className="px-4 pb-1 text-xs font-semibold text-gray-500 uppercase">Quản lý</p>
                     <Link
-                      href="/landlord/service"
+                      href="/landlord/buildings"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
-                      Quản lý dịch vụ
+                      Quản lý dãy
+                    </Link>
+                    <Link
+                      href="/landlord/billing"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Tính tiền
+                    </Link>
+                    <Link
+                      href="/landlord/stats"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      Thống kê
                     </Link>
                   </>
                 )}

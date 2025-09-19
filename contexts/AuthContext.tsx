@@ -50,14 +50,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } else if (storedUser) {
-        // Nếu không có token nhưng có user data, sử dụng dữ liệu cũ
-        setUser(JSON.parse(storedUser));
+        // Không có token nhưng còn dữ liệu user cũ: dọn dẹp để tránh UI hiển thị sai
+        localStorage.removeItem("user");
+        setUser(null);
       }
       
       setIsLoading(false);
     };
 
     initializeAuth();
+    
+    // Lắng nghe sự kiện đăng xuất toàn cục (ví dụ phát từ utils/api khi 401)
+    const onGlobalLogout = () => {
+      setUser(null);
+      try {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      } catch {}
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('app:logout', onGlobalLogout);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('app:logout', onGlobalLogout);
+      }
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

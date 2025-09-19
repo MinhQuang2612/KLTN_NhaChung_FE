@@ -15,14 +15,27 @@ function Modal({ open, onClose, onSave, children, title }: { open: boolean; onCl
 
   return createPortal(
     <div className="fixed inset-0 z-[100]">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl max-h-[85vh] overflow-auto bg-white rounded-2xl shadow-2xl">
-          <div className="px-5 py-3 border-b font-semibold">{title || "Chọn địa chỉ"}</div>
-          <div className="p-5">{children}</div>
-          <div className="px-5 pb-4 flex justify-end gap-3">
-            <button onClick={onClose} className="h-10 px-4 rounded-lg border border-gray-300">Hủy</button>
-            <button onClick={onSave} className="h-10 px-4 rounded-lg bg-teal-500 text-white">Lưu</button>
+        <div className="w-full max-w-3xl max-h-[85vh] overflow-auto bg-white rounded-2xl shadow-2xl border border-gray-100 ring-1 ring-black/5">
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-teal-600 to-teal-500 text-white rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">📍</span>
+              <div className="font-semibold">{title || "Chọn địa chỉ"}</div>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Đóng"
+              className="h-8 w-8 grid place-items-center rounded-full bg-white/15 text-white hover:bg-white/25"
+              title="Đóng"
+            >
+              ×
+            </button>
+          </div>
+          <div className="p-6">{children}</div>
+          <div className="px-6 pb-5 flex justify-end gap-3">
+            <button onClick={onClose} className="h-10 px-4 rounded-lg border border-gray-300 hover:bg-gray-50">Hủy</button>
+            <button onClick={onSave} className="h-10 px-5 rounded-lg bg-teal-600 text-white hover:bg-teal-700">Lưu</button>
           </div>
         </div>
       </div>
@@ -37,21 +50,24 @@ function AlertModal({ open, onClose, children, title }: { open: boolean; onClose
 
   return createPortal(
     <div className="fixed inset-0 z-[100]">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/5" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl max-h-[85vh] overflow-auto bg-white rounded-2xl shadow-2xl border">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <div className="text-lg font-semibold">{title || "Thông báo"}</div>
+        <div className="w-full max-w-2xl max-h-[85vh] overflow-auto bg-white rounded-2xl shadow-2xl border border-gray-100 ring-1 ring-black/5">
+          <div className="flex items-center justify-between px-6 py-4 border-b">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-600">!</span>
+              <div className="text-lg font-semibold text-gray-900">{title || "Thông báo"}</div>
+            </div>
             <button
               onClick={onClose}
               aria-label="Đóng"
-              className="h-8 w-8 grid place-items-center rounded-full bg-red-50 text-red-600 hover:bg-red-100"
+              className="h-8 w-8 grid place-items-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
               title="Đóng"
             >
               ×
             </button>
           </div>
-          <div className="p-5">{children}</div>
+          <div className="p-6">{children}</div>
         </div>
       </div>
     </div>,
@@ -93,7 +109,6 @@ export default function BuildingForm({
       showSpecificAddress: false,
       additionalInfo: "",
     },
-    totalFloors: 1,
     totalRooms: 1,
     buildingType: "chung-cu",
     images: [],
@@ -108,10 +123,13 @@ export default function BuildingForm({
   const [addressDraft, setAddressDraft] = useState<Address | null>(null);
   const [warnOpen, setWarnOpen] = useState(false);
   const [warnList, setWarnList] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
 
-  // Với form tạo mới, bỏ qua ảnh có sẵn (nếu có) vì chỉ chọn local
+  // Đồng bộ ảnh đã có (khi chỉnh sửa)
   useEffect(() => {
-    // no-op for create
+    if (Array.isArray(formData.images)) {
+      setExistingImages(formData.images);
+    }
   }, [formData.images]);
 
   const handleInputChange = (field: string, value: any) => {
@@ -141,6 +159,10 @@ export default function BuildingForm({
     setMediaItems(items);
   };
 
+  const handleRemoveExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     const warnings: string[] = [];
@@ -160,17 +182,13 @@ export default function BuildingForm({
       warnings.push("Vui lòng chọn Phường/Xã (địa chỉ)");
     }
 
-    if (formData.totalFloors < 1) {
-      newErrors.totalFloors = "Số tầng phải lớn hơn 0";
-      warnings.push("Số tầng phải ≥ 1");
-    }
-
     if (formData.totalRooms < 1) {
-      newErrors.totalRooms = "Số phòng phải lớn hơn 0";
-      warnings.push("Số phòng phải ≥ 1");
+      newErrors.totalRooms = "Số lượng phải lớn hơn 0";
+      warnings.push("Số lượng phải ≥ 1");
     }
 
-    if (mediaItems.length < 1) {
+    const total = existingImages.length + mediaItems.length;
+    if (total < 1) {
       newErrors.images = "Cần ít nhất 1 ảnh";
       warnings.push("Vui lòng chọn ít nhất 1 ảnh");
     }
@@ -197,13 +215,13 @@ export default function BuildingForm({
         return;
       }
       
-      // Upload tất cả ảnh local đã chọn
+      // Upload ảnh local mới
       const files = mediaItems.map((item) => item.file);
       const uploadedUrls: string[] = files.length ? await uploadFiles(files, user.userId, "images") : [];
 
       const submitData = {
         ...formData,
-        images: uploadedUrls,
+        images: [...existingImages, ...uploadedUrls],
       };
 
       onSubmit(submitData);
@@ -216,7 +234,7 @@ export default function BuildingForm({
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="px-6 py-5 bg-gradient-to-r from-teal-600 to-teal-500 text-white">
         <h1 className="text-2xl font-semibold">Thông tin dãy</h1>
         <p className="text-white/90 text-sm mt-1">Điền các thông tin dưới đây để tạo dãy mới</p>
@@ -232,6 +250,27 @@ export default function BuildingForm({
               onMediaChange={handleMediaChange}
               maxImages={10}
               maxVideos={0}
+              extraTop={existingImages.length ? (
+                <div className="mb-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {existingImages.map((url, idx) => (
+                      <div key={`exist-${idx}`} className="relative rounded-2xl overflow-hidden border bg-white">
+                        <div className="relative pb-[133%]">
+                          <img src={url} className="absolute inset-0 w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExistingImage(idx)}
+                          className="absolute top-1 right-1 h-6 w-6 rounded-full bg-red-500 text-white grid place-items-center text-[14px] font-bold shadow hover:bg-red-600"
+                          title="Xóa ảnh"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             />
           </div>
 
@@ -271,29 +310,7 @@ export default function BuildingForm({
               </label>
             </div>
 
-            {/* Số tầng */}
-            <div className="relative">
-              <input
-                type="number"
-                min="1"
-                value={Number.isFinite(formData.totalFloors) && formData.totalFloors >= 1 ? formData.totalFloors : 1}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const val = raw === "" ? 1 : parseInt(raw, 10);
-                  const safe = Number.isNaN(val) ? 1 : Math.max(1, val);
-                  handleInputChange("totalFloors", safe);
-                }}
-                placeholder=" "
-                className={`peer w-full rounded-2xl border-2 px-4 pt-6 pb-3 outline-none transition-colors focus:border-teal-500 ${
-                  errors.totalFloors ? "border-red-300" : "border-gray-300"
-                }`}
-              />
-              <label className="pointer-events-none absolute left-4 top-2 bg-white px-1 text-xs text-gray-500">
-                Số tầng <span className="text-red-500">*</span>
-              </label>
-            </div>
-
-            {/* Số phòng */}
+            {/* Số lượng (phòng/căn) */}
             <div className="relative">
               <input
                 type="number"
@@ -311,7 +328,7 @@ export default function BuildingForm({
                 }`}
               />
               <label className="pointer-events-none absolute left-4 top-2 bg-white px-1 text-xs text-gray-500">
-                Số phòng <span className="text-red-500">*</span>
+                {formData.buildingType === 'nha-nguyen-can' ? 'Số căn' : 'Số phòng'} <span className="text-red-500">*</span>
               </label>
             </div>
 

@@ -31,17 +31,21 @@ export type Utilities = {
   internetFee?: number;
   garbageFee?: number;
   cleaningFee?: number;
+  parkingMotorbikeFee?: number;
+  parkingCarFee?: number;
   managementFee?: number;
   managementFeeUnit?: "per_month" | "per_m2_per_month";
-  parkingCarFee?: number;
   gardeningFee?: number;
+  cookingGasFee?: number;
   includedInRent?: {
     electricity?: boolean;
     water?: boolean;
     internet?: boolean;
     garbage?: boolean;
     cleaning?: boolean;
-    management?: boolean;
+    parkingMotorbike?: boolean;
+    parkingCar?: boolean;
+    managementFee?: boolean;
   };
 };
 
@@ -66,6 +70,7 @@ export type Room = {
   nhaNguyenCanInfo?: NhaNguyenCanInfo;
   utilities?: Utilities;
   images: string[];
+  videos?: string[];
   description: string;
   isActive: boolean;
   createdAt: string;
@@ -98,6 +103,7 @@ export type CreateRoomPayload = {
   nhaNguyenCanInfo?: NhaNguyenCanInfo;
   utilities?: Utilities;
   images: string[];
+  videos?: string[];
   description: string;
 };
 

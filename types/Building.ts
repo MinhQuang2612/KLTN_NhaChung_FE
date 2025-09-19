@@ -6,7 +6,6 @@ export type Building = {
   buildingId: number;
   name: string;
   address: Address;
-  totalFloors: number;
   totalRooms: number;
   buildingType: BuildingType;
   images: string[];
@@ -20,7 +19,6 @@ export type Building = {
 export type CreateBuildingPayload = {
   name: string;
   address: Address;
-  totalFloors: number;
   totalRooms: number;
   buildingType: BuildingType;
   images: string[];

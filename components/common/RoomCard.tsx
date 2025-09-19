@@ -46,7 +46,7 @@ export default function RoomCard({
           <img
             src={cover}
             alt={title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
             loading="lazy"
           />
         ) : (
@@ -135,8 +135,8 @@ export default function RoomCard({
         <div className="text-gray-700 text-sm mb-2 group-hover:text-gray-800 transition-colors duration-300">
           {[
             area != null ? `${area} m²` : null,
-            bedrooms != null ? `${bedrooms} PN` : null,
-            bathrooms != null ? `${bathrooms} WC` : null,
+            bedrooms != null ? `${bedrooms} phòng ngủ` : null,
+            bathrooms != null ? `${bathrooms} phòng tắm` : null,
           ]
             .filter(Boolean)
             .join(" • ")}
