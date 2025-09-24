@@ -462,19 +462,8 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
           {postType === 'roommate' && (
             <>
               <Row label="Loại phòng:" value={translateRoomType(roomData?.category)} />
-              {typeof roomData?.currentOccupants === 'number' && (
-                <Row label="Số người hiện tại:" value={String(roomData.currentOccupants)} />
-              )}
-              {typeof roomData?.estimatedMonthlyUtilities === 'number' && (
-                <Row label="Ước tính chi phí/tháng:" value={`${formatNumberVN(roomData.estimatedMonthlyUtilities)} đ/tháng`} />
-              )}
-              {typeof roomData?.capIncludedAmount === 'number' && (
-                <Row label="Mức bao gồm tối đa:" value={`${formatNumberVN(roomData.capIncludedAmount)} đ`} />
-              )}
+              
               <Row label="Cách chia tiền điện nước:" value={translateShareMethod(roomData?.shareMethod)} />
-              <Row label="Số người tối đa:" value={String(roomData?.maxOccupancy || 0)} />
-              <Row label="Chỗ trống còn lại:" value={String(roomData?.availableSpots || 0)} />
-              <Row label="Giá ở ghép:" value={roomData?.sharePrice ? `${formatNumberVN(roomData.sharePrice)} đ/tháng` : 'Chưa có thông tin'} />
             </>
           )}
         </div>

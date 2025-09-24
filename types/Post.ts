@@ -8,6 +8,7 @@ export type PostSource = 'room_management' | 'manual_post' | 'user_post';
 export interface PersonalInfo {
   fullName: string;
   age: number;
+  dateOfBirth: string; // ISO 8601 date string
   gender: 'male' | 'female' | 'other';
   occupation: string;
   hobbies: string[];

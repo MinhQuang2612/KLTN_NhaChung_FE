@@ -34,6 +34,7 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
     personalInfo: {
       fullName: "",
       age: 0,
+      dateOfBirth: "",
       gender: "male",
       occupation: "",
       hobbies: [],
@@ -74,13 +75,25 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
   };
 
   const handlePersonalInfoChange = (name: keyof PersonalInfo, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      personalInfo: {
+    setFormData((prev) => {
+      const newPersonalInfo = {
         ...prev.personalInfo,
         [name]: value,
-      } as PersonalInfo,
-    }));
+      } as PersonalInfo;
+
+      // Calculate dateOfBirth when age changes
+      if (name === 'age' && typeof value === 'number' && value > 0) {
+        const currentYear = new Date().getFullYear();
+        const birthYear = currentYear - value;
+        const dateOfBirth = `${birthYear}-01-01T00:00:00.000Z`; // ISO 8601 format
+        newPersonalInfo.dateOfBirth = dateOfBirth;
+      }
+
+      return {
+        ...prev,
+        personalInfo: newPersonalInfo,
+      };
+    });
   };
 
   const handleRequirementsChange = (name: keyof Requirements, value: any) => {
@@ -120,6 +133,11 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
         throw new Error('Không tìm thấy thông tin người dùng');
       }
 
+      // Validate roomId
+      if (!formData.roomId || formData.roomId <= 0) {
+        throw new Error('Vui lòng chọn phòng hợp lệ');
+      }
+
       // Validate required fields
       if (!formData.title?.trim()) {
         throw new Error('Vui lòng nhập tiêu đề bài đăng');
@@ -140,6 +158,25 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
         throw new Error('Email không đúng định dạng');
       }
 
+      // Validate roommate-specific required fields
+      if (postType === "roommate") {
+        if (!formData.personalInfo?.fullName?.trim()) {
+          throw new Error('Vui lòng nhập họ và tên');
+        }
+        if (!formData.personalInfo?.age || formData.personalInfo.age <= 0) {
+          throw new Error('Vui lòng nhập tuổi hợp lệ');
+        }
+        if (!formData.personalInfo?.gender) {
+          throw new Error('Vui lòng chọn giới tính');
+        }
+        // Ensure dateOfBirth is calculated
+        if (!formData.personalInfo?.dateOfBirth && formData.personalInfo?.age > 0) {
+          const currentYear = new Date().getFullYear();
+          const birthYear = currentYear - formData.personalInfo.age;
+          formData.personalInfo.dateOfBirth = `${birthYear}-01-01T00:00:00.000Z`;
+        }
+      }
+
       let imageUrls: string[] = [];
       if (localImages.length > 0) {
         const imageFiles = localImages.map((item) => item.file);
@@ -158,24 +195,59 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
       const payload: CreatePostPayload = {
         postType: backendPostType as any, // Cast to satisfy TypeScript
         roomId: formData.roomId!,
-        title: formData.title!,
-        description: formData.description!,
+        title: formData.title!.trim(),
+        description: formData.description!.trim(),
         images: imageUrls,
         videos: videoUrls,
-        phone: formData.phone || "",
-        email: formData.email || "",
+        phone: formData.phone!.trim(),
+        email: formData.email!.trim(),
       };
 
       if (postType === "roommate") {
+        // Ensure personalInfo is properly formatted
         if (formData.personalInfo) {
-          payload.personalInfo = formData.personalInfo;
+          // Calculate dateOfBirth if not already set
+          let dateOfBirth = formData.personalInfo.dateOfBirth;
+          if (!dateOfBirth && formData.personalInfo.age > 0) {
+            const currentYear = new Date().getFullYear();
+            const birthYear = currentYear - formData.personalInfo.age;
+            dateOfBirth = `${birthYear}-01-01T00:00:00.000Z`;
+          }
+
+          payload.personalInfo = {
+            fullName: formData.personalInfo.fullName?.trim() || "",
+            age: Number(formData.personalInfo.age) || 0,
+            dateOfBirth: dateOfBirth || `${new Date().getFullYear() - 25}-01-01T00:00:00.000Z`, // Default to 25 years old
+            gender: formData.personalInfo.gender || "male",
+            occupation: formData.personalInfo.occupation?.trim() || "",
+            hobbies: Array.isArray(formData.personalInfo.hobbies) ? formData.personalInfo.hobbies : [],
+            habits: Array.isArray(formData.personalInfo.habits) ? formData.personalInfo.habits : [],
+            lifestyle: formData.personalInfo.lifestyle || "normal",
+            cleanliness: formData.personalInfo.cleanliness || "normal"
+          };
         }
+        
+        // Ensure requirements is properly formatted
         if (formData.requirements) {
-          payload.requirements = formData.requirements;
+          payload.requirements = {
+            ageRange: Array.isArray(formData.requirements.ageRange) ? formData.requirements.ageRange : [0, 0],
+            gender: formData.requirements.gender || "any",
+            traits: Array.isArray(formData.requirements.traits) ? formData.requirements.traits : [],
+            maxPrice: Number(formData.requirements.maxPrice) || 0
+          };
         }
       }
 
-      await createPost(payload);
+      // Clean up payload - remove undefined/null values
+      const cleanPayload = JSON.parse(JSON.stringify(payload, (key, value) => {
+        if (value === null || value === undefined) {
+          return undefined; // Remove null/undefined values
+        }
+        return value;
+      }));
+
+
+      await createPost(cleanPayload);
       showSuccess("Thành công", "Đăng bài thành công!");
       onSuccess();
     } catch (err: any) {
