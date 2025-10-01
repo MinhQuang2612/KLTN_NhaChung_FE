@@ -41,7 +41,7 @@ export default function RoomSelector({
     return url.length > 0 && !url.startsWith('url');
   };
 
-  // Helper function để kiểm tra phòng đã được đăng bài hay chưa
+  // Helper function để kiểm tra phòng đã được đăng bài roommate active hay chưa
   const checkRoomPostedStatus = async (roomIds: number[]) => {
     try {
       const postedIds = new Set<number>();
@@ -50,11 +50,23 @@ export default function RoomSelector({
       for (const roomId of roomIds) {
         try {
           // User thường không được gọi API landlord, nên dùng endpoint public khi không phải landlord
-          const posts = user?.role === 'landlord'
-            ? await getPostsByRoom(roomId)
-            : (await getPosts({ roomId, status: 'active' as any })).posts;
-          // Nếu có bài đăng với status 'active' thì phòng đã được đăng
-          const hasActivePost = posts.some(post => post.status === 'active');
+          if (user?.role === 'landlord') {
+            const posts = await getPostsByRoom(roomId);
+            const hasActivePost = posts.some((post: any) => {
+              const t = String(post?.postType || '').toLowerCase();
+              return post?.status === 'active' && (t === 'roommate' || t === 'tim-o-ghep');
+            });
+            if (hasActivePost) postedIds.add(roomId);
+            continue;
+          }
+
+          // Không truyền postType/status để tránh BE filter sai key; lọc client-side
+          const res: any = await getPosts({ roomId } as any);
+          const list: any[] = Array.isArray(res?.posts) ? res.posts : Array.isArray(res) ? res : [];
+          const hasActivePost = list.some((post: any) => {
+            const t = String(post?.postType || '').toLowerCase();
+            return post?.status === 'active' && (t === 'roommate' || t === 'tim-o-ghep');
+          });
           if (hasActivePost) {
             postedIds.add(roomId);
           }
@@ -83,6 +95,19 @@ export default function RoomSelector({
       clearTimeout(timeoutId);
     };
   }, [postType, user?.userId]);
+
+  // Lắng nghe sự kiện thay đổi bài đăng để reload phòng ngay sau khi xóa/cập nhật
+  useEffect(() => {
+    const onPostsChanged = () => loadRooms();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('posts:changed', onPostsChanged);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('posts:changed', onPostsChanged);
+      }
+    };
+  }, []);
 
 
   const loadRooms = async () => {

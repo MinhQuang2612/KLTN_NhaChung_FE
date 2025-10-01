@@ -13,6 +13,17 @@ interface EditPostModalProps {
 }
 
 export default function EditPostModal({ isOpen, onClose, post, onSuccess }: EditPostModalProps) {
+  // Helper: tính tuổi từ ngày sinh (ISO)
+  const calcAge = (dob?: string) => {
+    if (!dob) return 0;
+    const d = new Date(dob);
+    if (isNaN(d.getTime())) return 0;
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return Math.max(0, age);
+  };
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -44,8 +55,13 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
   // Initialize form data when post changes
   useEffect(() => {
     if (post) {
+      const initialAge = (post.personalInfo?.age ?? undefined) as number | undefined;
+      const derivedAge = typeof initialAge === 'number' && !isNaN(initialAge)
+        ? initialAge
+        : calcAge(post.personalInfo?.dateOfBirth);
       setFormData({
         title: post.title || '',
+        // Với roommate posts, các trường dưới đây không được hiển thị/sửa
         description: post.description || '',
         phone: post.phone || '',
         email: post.email || '',
@@ -53,7 +69,7 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
         videos: post.videos || [],
         personalInfo: post.personalInfo || {
           fullName: '',
-          age: 0,
+          age: derivedAge || 0,
           gender: '',
           occupation: '',
           hobbies: [],
@@ -109,21 +125,24 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
       setLoading(true);
       setError(null);
 
-      // Prepare payload - only include fields that are allowed to be updated
-      const payload: any = {
-        title: formData.title,
-        description: formData.description,
-        phone: formData.phone,
-        email: formData.email,
-        images: formData.images,
-        videos: formData.videos
-      };
+      const isRoommatePost = post.postType === 'roommate' || post.postType === 'tim-o-ghep';
 
-      // Add personalInfo and requirements only for roommate posts
-      if (post.postType === 'roommate' || post.postType === 'tim-o-ghep') {
-        payload.personalInfo = formData.personalInfo;
-        payload.requirements = formData.requirements;
-      }
+      // Với roommate: chỉ cập nhật những gì user nhập khi đăng roommate
+      // Không gửi mô tả/ảnh/phone/email vì lấy từ phòng hoặc không dùng
+      const payload: any = isRoommatePost
+        ? {
+            title: formData.title,
+            personalInfo: formData.personalInfo,
+            requirements: formData.requirements,
+          }
+        : {
+            title: formData.title,
+            description: formData.description,
+            phone: formData.phone,
+            email: formData.email,
+            images: formData.images,
+            videos: formData.videos,
+          };
 
       // Use unified updatePost API
       await updatePost(post.postId, payload);
@@ -201,45 +220,51 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
               />
             </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mô tả *
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                required
-              />
-            </div>
+            {/* Description (ẩn với roommate) */}
+            {!isRoommatePost && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mô tả *
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  required
+                />
+              </div>
+            )}
 
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số điện thoại
-              </label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
+            {/* Phone (ẩn với roommate) */}
+            {!isRoommatePost && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Số điện thoại
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+            )}
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
+            {/* Email (ẩn với roommate) */}
+            {!isRoommatePost && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+            )}
 
             {/* Personal Info - Only for roommate posts */}
             {isRoommatePost && (
@@ -266,8 +291,12 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
                       </label>
                       <input
                         type="number"
-                        value={formData.personalInfo.age}
-                        onChange={(e) => handleInputChange('personalInfo.age', parseInt(e.target.value) || 0)}
+                        value={Number(formData?.personalInfo?.age ?? calcAge(post?.personalInfo?.dateOfBirth))}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const n = v === '' ? 0 : Number.parseInt(v, 10) || 0;
+                          handleInputChange('personalInfo.age', n);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                       />
                     </div>
@@ -328,9 +357,63 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
                       </label>
                       <input
                         type="number"
-                        value={formData.requirements.maxPrice}
-                        onChange={(e) => handleInputChange('requirements.maxPrice', parseInt(e.target.value) || 0)}
+                        value={Number(formData?.requirements?.maxPrice ?? 0)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const n = v === '' ? 0 : Number.parseInt(v, 10) || 0;
+                          handleInputChange('requirements.maxPrice', n);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Khoảng tuổi mong muốn (phù hợp luồng đăng) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Khoảng tuổi mong muốn
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={Number(formData?.requirements?.ageRange?.[0] ?? 18)}
+                          onChange={(e) => {
+                            const min = Number(e.target.value || 0);
+                            const max = Number(formData?.requirements?.ageRange?.[1] ?? 60);
+                            handleInputChange('requirements.ageRange', [min, Math.max(min, max)]);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                        <span className="text-gray-500">-</span>
+                        <input
+                          type="number"
+                          value={Number(formData?.requirements?.ageRange?.[1] ?? 60)}
+                          onChange={(e) => {
+                            const max = Number(e.target.value || 0);
+                            const min = Number(formData?.requirements?.ageRange?.[0] ?? 18);
+                            handleInputChange('requirements.ageRange', [Math.min(min, max), max]);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tính cách mong muốn (traits) */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tính cách mong muốn (phân tách bằng dấu phẩy)
+                      </label>
+                      <input
+                        type="text"
+                        value={(formData?.requirements?.traits || []).join(', ')}
+                        onChange={(e) => {
+                          const arr = e.target.value
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                          handleInputChange('requirements.traits', arr);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                        placeholder="sạch sẽ, yên tĩnh, thân thiện"
                       />
                     </div>
                   </div>
@@ -338,15 +421,32 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
               </>
             )}
 
-            {/* Media */}
-            <div className="border-t pt-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Hình ảnh & Video</h3>
-              <MediaPickerLocal
-                onMediaChange={handleMediaChange}
-                maxImages={12}
-                maxVideos={3}
-              />
-            </div>
+            {/* Media (ẩn với roommate) */}
+            {!isRoommatePost && (
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Hình ảnh & Video</h3>
+                {/* Hiển thị ảnh hiện có (nếu có) bên trên khung chọn */}
+                <MediaPickerLocal
+                  onMediaChange={handleMediaChange}
+                  maxImages={12}
+                  maxVideos={3}
+                  extraTop={
+                    Array.isArray(formData.images) && formData.images.length > 0 ? (
+                      <div className="mb-3">
+                        <div className="text-sm text-gray-600 mb-2">Ảnh hiện có</div>
+                        <div className="grid grid-cols-3 gap-3">
+                          {formData.images.map((src, i) => (
+                            <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-white">
+                              <img src={src} className="absolute inset-0 w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  }
+                />
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-3 pt-6 border-t">

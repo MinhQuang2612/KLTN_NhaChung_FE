@@ -104,6 +104,14 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
   const translateRoomType = (t?: string) => {
     if (!t) return undefined;
     const map: Record<string, string> = {
+      // Map chi tiết theo spec VN
+      'phong-tro': 'Phòng trọ',
+      'phong-tro-day-du': 'Phòng trọ đầy đủ',
+      'phong-tro-co-ban': 'Phòng trọ cơ bản',
+      'phong-tro-trong': 'Phòng trọ trống',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+      // Legacy fallback
       'single': 'Phòng đơn',
       'double': 'Phòng đôi',
       'shared': 'Phòng 3-4 người',

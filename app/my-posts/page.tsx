@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import Footer from "../../components/common/Footer";
+import NotificationModal from "../../components/common/NotificationModal";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import MyPostsContent from "../../components/my-posts/MyPostsContent";
-import { getUserPosts } from "../../services/posts";
+import { getUserPosts, deletePost, activatePost } from "../../services/posts";
 import { Post } from "../../types/Post";
 
 // Mock data cho bài đăng
@@ -122,6 +124,8 @@ export default function MyPostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noti, setNoti] = useState<{open: boolean; type: 'success'|'error'|'warning'|'info'; title: string; message: string}>({open:false, type:'info', title:'', message:''});
+  const [confirm, setConfirm] = useState<{open: boolean; postId?: number}>({open:false});
 
   // Load user's posts (both rent and roommate)
   const loadUserPosts = async () => {
@@ -165,7 +169,24 @@ export default function MyPostsPage() {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    setConfirm({ open: true, postId: id });
+  };
+
+  const doDelete = async () => {
+    const id = confirm.postId!;
+    try {
+      await deletePost(id);
+      await loadUserPosts();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('posts:changed'));
+      }
+      setNoti({ open: true, type: 'success', title: 'Đã ẩn bài đăng', message: 'Bài đăng đã được ẩn thành công.' });
+    } catch (e: any) {
+      setNoti({ open: true, type: 'error', title: 'Ẩn thất bại', message: e?.message || 'Không thể ẩn bài đăng.' });
+    } finally {
+      setConfirm({ open: false, postId: undefined });
+    }
   };
 
   return (
@@ -200,12 +221,40 @@ export default function MyPostsPage() {
             onEdit={handleEdit}
             onView={handleView}
             onDelete={handleDelete}
+            onActivate={async (id: number) => {
+              try {
+                await activatePost(id);
+                await loadUserPosts();
+                setNoti({ open: true, type: 'success', title: 'Đã kích hoạt', message: 'Bài đăng đã được hiển thị trở lại.' });
+              } catch (e: any) {
+                setNoti({ open: true, type: 'error', title: 'Kích hoạt thất bại', message: e?.message || 'Không thể kích hoạt bài đăng.' });
+              }
+            }}
             onRefresh={loadUserPosts}
           />
         )}
       </div>
 
       <Footer />
+      {/* Confirm delete modal - gọn và không chồng nút */}
+      <ConfirmModal
+        isOpen={confirm.open}
+        onClose={() => setConfirm({ open: false })}
+        onConfirm={doDelete}
+        title="Ẩn bài đăng?"
+        message="Bạn có chắc muốn ẩn bài đăng này? Bạn có thể kích hoạt lại sau."
+        confirmText="Ẩn"
+        cancelText="Hủy"
+        type="danger"
+      />
+      {/* Toast result */}
+      <NotificationModal
+        isOpen={noti.open}
+        onClose={() => setNoti(prev=>({ ...prev, open:false }))}
+        type={noti.type}
+        title={noti.title}
+        message={noti.message}
+      />
     </div>
   );
 }

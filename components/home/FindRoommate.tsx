@@ -16,22 +16,51 @@ import { useAuth } from "../../contexts/AuthContext";
       const loadRoommatePosts = async () => {
         try {
           setLoading(true);
-          const response = await listRoommatePosts();
-          
-          // Process API data
-          const apiData = Array.isArray((response as any)?.data) 
-            ? (response as any).data 
-            : Array.isArray(response) 
-            ? response 
+          // 1) Thử gọi danh sách với filter postType=roommate
+          let response: any = await listRoommatePosts({ status: 'active' });
+          let apiData: any[] = Array.isArray((response as any)?.posts)
+            ? (response as any).posts
+            : Array.isArray(response)
+            ? (response as any)
             : [];
+
+          // 2) Nếu rỗng, fallback sang search endpoint
+          if (!apiData || apiData.length === 0) {
+            try {
+              const searchMod = await import("../../services/posts");
+              const searchRes = await searchMod.searchPosts({ postType: 'roommate' });
+              apiData = Array.isArray((searchRes as any)?.posts)
+                ? (searchRes as any).posts
+                : Array.isArray(searchRes)
+                ? (searchRes as any)
+                : [];
+            } catch {}
+          }
+
+          // 3) Nếu vẫn rỗng, lấy tất cả và lọc client-side theo 'roommate' hoặc 'tim-o-ghep'
+          if (!apiData || apiData.length === 0) {
+            try {
+              const postsMod = await import("../../services/posts");
+              const allRes = await postsMod.getPosts();
+              const allList: any[] = Array.isArray((allRes as any)?.posts)
+                ? (allRes as any).posts
+                : Array.isArray(allRes)
+                ? (allRes as any)
+                : [];
+              apiData = allList.filter((p: any) => {
+                const t = (p?.postType || '').toLowerCase();
+                return t === 'roommate' || t === 'tim-o-ghep';
+              });
+            } catch {}
+          }
             
-          // Transform API data to display format
+          // Transform API data to display format (ưu tiên hiển thị TITLE)
           const transformedPosts = apiData.slice(0, 6).map((post: RoommatePost) => {
-            const roommatePostId = (post as any).roommatePostId || post.postId;
+            const roommatePostId = (post as any).postId || (post as any).roommatePostId || (post as any).id;
             return {
               id: roommatePostId,
-              img: post.images?.[0] || "/home/room.png",
-              text: post.description || post.title
+              img: (post as any).images?.[0] || "/home/room.png",
+              text: (post as any).title || (post as any).description || ''
             };
           });
           
@@ -97,17 +126,19 @@ import { useAuth } from "../../contexts/AuthContext";
                   className="flex gap-6 overflow-x-hidden scroll-smooth pb-4"
                 >
                   {posts.map(p=>(
-                    <article key={p.id} className="flex-shrink-0 w-80 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <article 
+                      key={p.id} 
+                      className="flex-shrink-0 w-80 p-4 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleViewDetail(p.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleViewDetail(p.id); }}
+                    >
                       <div className="flex gap-4">
                         <img src={p.img} alt="" className="w-28 h-28 object-cover rounded-xl"/>
                         <div className="flex flex-col flex-1">
-                          <p className="text-sm text-slate-700 mb-3 flex-1 line-clamp-3">{p.text}</p>
-                          <button 
-                            onClick={() => handleViewDetail(p.id)}
-                            className="self-start px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium transition-colors"
-                          >
-                            Xem chi tiết
-                          </button>
+                          <h4 className="text-base md:text-lg font-bold text-gray-900 leading-snug line-clamp-2 mb-1">{p.text}</h4>
+                          <span className="text-xs text-slate-500">Bấm để xem chi tiết</span>
                         </div>
                       </div>
                     </article>

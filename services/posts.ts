@@ -125,6 +125,11 @@ export async function deletePost(id: number): Promise<{ message: string; postId:
   return apiDel(`${BASE_URL}/${id}`);
 }
 
+// Kích hoạt lại bài đăng đã ẩn (status -> active)
+export async function activatePost(id: number): Promise<Post> {
+  return apiPut(`${BASE_URL}/${id}`, { status: 'active' } as any);
+}
+
 // ==================== LANDLORD ENDPOINTS ====================
 
 /**

@@ -93,6 +93,27 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
   };
 
   const renderStepContent = () => {
+    // Yêu cầu tài khoản đã xác thực mới được đăng bài
+    if (!user?.isVerified) {
+      return (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86A2.07 2.07 0 0021 16.93V7.07A2.07 2.07 0 0018.93 5H5.07A2.07 2.07 0 003 7.07v9.86A2.07 2.07 0 005.07 19z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Cần xác thực tài khoản</h3>
+          <p className="text-gray-600 mb-4">Vui lòng xác thực danh tính trước khi đăng bài để bảo vệ cộng đồng.</p>
+          <a
+            href="/profile"
+            className="inline-flex items-center px-5 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            Xác thực ngay
+          </a>
+        </div>
+      );
+    }
+
     switch (currentStep) {
       case 'select-room':
         return (

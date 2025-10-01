@@ -28,6 +28,7 @@ interface MyPostsContentProps {
   onEdit: (id: number) => void;
   onView: (id: number) => void;
   onDelete: (id: number) => void;
+  onActivate: (id: number) => void;
   onRefresh: () => void;
 }
 
@@ -83,7 +84,7 @@ const normalizePost = async (post: Post): Promise<LegacyPost> => {
   };
 };
 
-export default function MyPostsContent({ posts, onEdit, onView, onDelete, onRefresh }: MyPostsContentProps) {
+export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActivate, onRefresh }: MyPostsContentProps) {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "pending" | "inactive">("all");
   const [postTypeFilter, setPostTypeFilter] = useState<"all" | "rent" | "roommate">("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -475,12 +476,21 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onRefr
                         >
                           Xem chi tiết
                         </button>
-                        <button
-                          onClick={() => handleDelete(post.id)}
-                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                        >
-                          Xóa
-                        </button>
+                        {post.status === 'inactive' ? (
+                          <button
+                            onClick={() => onActivate(post.id)}
+                            className="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                          >
+                            Kích hoạt
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleDelete(post.id)}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                          >
+                            Ẩn
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
