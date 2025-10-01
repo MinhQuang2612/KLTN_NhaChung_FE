@@ -8,6 +8,7 @@ import { rentPostToUnified, roommatePostToUnified, shuffleArray, UnifiedPost } f
 import { getMyProfile, UserProfile } from "@/services/userProfiles";
 import { rankPosts, PostRankingOptions } from "@/services/postRanking";
 import { useAuth } from "@/contexts/AuthContext";
+import { checkMultiplePostsVisibility } from "@/utils/roomVisibility";
 
 type SortKey = "random" | "newest" | "priceAsc" | "priceDesc" | "areaDesc";
 
@@ -46,60 +47,75 @@ export default function RoomList() {
           ? searchResponse.posts
           : [];
         
-        // Convert to unified format và fetch room data
-        const unifiedPosts: UnifiedPost[] = await Promise.all(
-          allPosts.map(async (post: any) => {
-            // Map backend postType to frontend format
-            const mappedPostType = post.postType === 'cho-thue' ? 'rent' : 
-                                   post.postType === 'tim-o-ghep' ? 'roommate' : post.postType;
-            
-            // Try to get room data if post has roomId
-            let roomData = null;
-            let price = 0;
-            let area = 0;
-            let location = 'Chưa xác định';
-            let address = undefined;
-            let bedrooms = undefined;
-            let bathrooms = undefined;
-            let images = post.images || [];
-            
-            if (post.roomId) {
+        // Fetch room data for all posts first
+        const roomDataMap: Record<string, any> = {};
+        await Promise.all(
+          allPosts
+            .filter(post => post.roomId)
+            .map(async (post: any) => {
               try {
-                roomData = await getRoomById(post.roomId);
-                price = roomData.price || 0;
-                area = roomData.area || 0;
-                location = roomData.address ? 
-                  `${roomData.address.ward}, ${roomData.address.city}` : 
-                  'Chưa xác định';
-                address = roomData.address;
-                bedrooms = roomData.chungCuInfo?.bedrooms || roomData.nhaNguyenCanInfo?.bedrooms;
-                bathrooms = roomData.chungCuInfo?.bathrooms || roomData.nhaNguyenCanInfo?.bathrooms;
-                images = roomData.images?.length > 0 ? roomData.images : (post.images || []);
+                const roomData = await getRoomById(post.roomId);
+                roomDataMap[post.roomId] = roomData;
               } catch (error) {
+                // Room data không tải được, sẽ skip post này
               }
-            }
-            
-            // Convert new API format to UnifiedPost format
-            return {
-              id: post.postId,
-              type: mappedPostType as 'rent' | 'roommate',
-              title: post.title || 'Không có tiêu đề',
-              description: post.description || 'Không có mô tả',
-              images: images,
-              price: price,
-              area: area,
-              location: location,
-              address: address,
-              category: post.category || mappedPostType,
-              photoCount: images.length + (post.videos?.length || 0),
-              bedrooms: bedrooms,
-              bathrooms: bathrooms,
-              isVerified: false,
-              createdAt: post.createdAt,
-              originalData: post
-            };
-          })
+            })
         );
+
+        // Filter posts based on room visibility logic
+        const visibilityResults = checkMultiplePostsVisibility(allPosts, roomDataMap);
+        const visiblePosts = visibilityResults
+          .filter(result => result.shouldShow)
+          .map(result => result.post);
+
+        // Convert to unified format
+        const unifiedPosts: UnifiedPost[] = visiblePosts.map((post: any) => {
+          // Map backend postType to frontend format
+          const mappedPostType = post.postType === 'cho-thue' ? 'rent' : 
+                                 post.postType === 'tim-o-ghep' ? 'roommate' : post.postType;
+          
+          // Get room data
+          const roomData = roomDataMap[post.roomId];
+          let price = 0;
+          let area = 0;
+          let location = 'Chưa xác định';
+          let address = undefined;
+          let bedrooms = undefined;
+          let bathrooms = undefined;
+          let images = post.images || [];
+          
+          if (roomData) {
+            price = roomData.price || 0;
+            area = roomData.area || 0;
+            location = roomData.address ? 
+              `${roomData.address.ward}, ${roomData.address.city}` : 
+              'Chưa xác định';
+            address = roomData.address;
+            bedrooms = roomData.chungCuInfo?.bedrooms || roomData.nhaNguyenCanInfo?.bedrooms;
+            bathrooms = roomData.chungCuInfo?.bathrooms || roomData.nhaNguyenCanInfo?.bathrooms;
+            images = roomData.images?.length > 0 ? roomData.images : (post.images || []);
+          }
+          
+          // Convert new API format to UnifiedPost format
+          return {
+            id: post.postId,
+            type: mappedPostType as 'rent' | 'roommate',
+            title: post.title || 'Không có tiêu đề',
+            description: post.description || 'Không có mô tả',
+            images: images,
+            price: price,
+            area: area,
+            location: location,
+            address: address,
+            category: post.category || mappedPostType,
+            photoCount: images.length + (post.videos?.length || 0),
+            bedrooms: bedrooms,
+            bathrooms: bathrooms,
+            isVerified: false,
+            createdAt: post.createdAt,
+            originalData: post
+          };
+        });
         
         // Sử dụng service ranking với priority city filter
         // Fallback về selectedCity nếu profile không có preferredCity

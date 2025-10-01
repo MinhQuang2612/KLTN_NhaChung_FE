@@ -19,22 +19,28 @@ export interface AddFavoriteRequest {
  * Get all favorites for a user
  */
 export async function getUserFavorites(userId: number): Promise<Favorite[]> {
-  const allFavorites = await apiGet('favourites');
-  return allFavorites.filter((fav: Favorite) => fav.userId === userId);
+  // TODO: API endpoint có thể gây lỗi "Invalid user ID"
+  return [];
+  // const allFavorites = await apiGet('favourites');
+  // return allFavorites.filter((fav: Favorite) => fav.userId === userId);
 }
 
 /**
  * Add to favorites
  */
 export async function addToFavorites(request: AddFavoriteRequest): Promise<Favorite> {
-  return apiPost('favourites', request);
+  // TODO: API endpoint có thể gây lỗi
+  throw new Error("API endpoint chưa được implement");
+  // return apiPost('favourites', request);
 }
 
 /**
  * Remove from favorites
  */
 export async function removeFromFavorites(userId: number, postType: 'rent' | 'roommate', postId: number): Promise<void> {
-  return apiDel(`favourites/user/${userId}/post/${postType}/${postId}`);
+  // TODO: API endpoint có thể gây lỗi
+  throw new Error("API endpoint chưa được implement");
+  // return apiDel(`favourites/user/${userId}/post/${postType}/${postId}`);
 }
 
 /**

@@ -34,9 +34,11 @@ export default function ContractView({ contractId }: ContractViewProps) {
       const loadContract = async () => {
         try {
           setLoading(true);
+          console.log('🔍 [DEBUG] Loading contract with ID:', contractId);
           const data = await getUserContract(contractId);
           setContract(data);
         } catch (error: any) {
+          console.log('🔍 [DEBUG] Error loading contract:', error);
           let errorMessage = error.message || 'Không thể tải hợp đồng';
       
       // Xử lý các loại lỗi cụ thể

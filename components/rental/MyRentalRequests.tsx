@@ -19,7 +19,17 @@ export default function MyRentalRequests() {
     try {
       setLoading(true);
       const data = await getUserRentalRequests();
-      setRequests(data);
+      // Filter chỉ hiển thị rental requests thực sự (không phải room sharing requests)
+      // Dựa vào requestType để phân biệt rental và room sharing
+      const rentalRequests = data.filter(request => 
+        (request as any).requestType !== 'room_sharing' && (
+          request.status === 'pending' || 
+          request.status === 'approved' || 
+          request.status === 'rejected' || 
+          request.status === 'cancelled'
+        )
+      );
+      setRequests(rentalRequests);
     } catch (error: any) {
       const message = ToastMessages.error.load('Danh sách đăng ký thuê');
       showError(message.title, error.message || message.message);
@@ -33,7 +43,9 @@ export default function MyRentalRequests() {
       'pending': 'bg-yellow-100 text-yellow-800',
       'approved': 'bg-green-100 text-green-800',
       'rejected': 'bg-red-100 text-red-800',
-      'cancelled': 'bg-gray-100 text-gray-800'
+      'cancelled': 'bg-gray-100 text-gray-800',
+      'pending_user_approval': 'bg-blue-100 text-blue-800',
+      'pending_landlord_approval': 'bg-purple-100 text-purple-800'
     };
     return colorMap[status as keyof typeof colorMap] || 'bg-gray-100 text-gray-800';
   };

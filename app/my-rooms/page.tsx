@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserRooms, UserRoom } from '@/services/rooms';
+import { getUserRentalRequests } from '@/services/rentalRequests';
 import Link from 'next/link';
 
 const MyRoomsPage = () => {
@@ -21,7 +22,18 @@ const MyRoomsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const roomsData = await getUserRooms();
+      
+      // Thử cả 2 API để lấy tất cả phòng đã thuê
+      const [roomsData, rentalRequestsData] = await Promise.all([
+        getUserRooms().catch(err => {
+          return [];
+        }),
+        getUserRentalRequests().catch(err => {
+          return [];
+        })
+      ]);
+      
+      // TODO: Kết hợp dữ liệu từ cả 2 API khi cần
       setRooms(roomsData);
     } catch (err) {
       setError('Không thể tải danh sách phòng. Vui lòng thử lại sau.');

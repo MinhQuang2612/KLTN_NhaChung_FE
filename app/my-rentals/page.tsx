@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import MyRentalRequests from "@/components/rental/MyRentalRequests";
 import PendingInvoices from "@/components/payments/PendingInvoices";
+import MySharingRequests from "@/components/room_sharing/MySharingRequests";
+import UserASharingRequests from "@/components/room_sharing/UserASharingRequests";
 
 export default function MyRentalsPage() {
-  const [activeTab, setActiveTab] = useState<'requests' | 'invoices'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'invoices' | 'my-sharing' | 'pending-sharing'>('requests');
   const { user, isLoading } = useAuth();
 
   // Hiển thị loading khi AuthContext đang khởi tạo
@@ -44,7 +46,7 @@ export default function MyRentalsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Quản lý thuê phòng</h1>
-          <p className="text-gray-600 mt-2">Theo dõi đăng ký thuê và thanh toán của bạn</p>
+          <p className="text-gray-600 mt-2">Theo dõi đăng ký thuê, thanh toán và ở ghép của bạn</p>
         </div>
 
         {/* Tabs */}
@@ -71,12 +73,34 @@ export default function MyRentalsPage() {
               >
                 Hóa đơn thanh toán
               </button>
+              <button
+                onClick={() => setActiveTab('my-sharing')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'my-sharing'
+                    ? 'border-teal-500 text-teal-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Yêu cầu ở ghép của tôi
+              </button>
+              <button
+                onClick={() => setActiveTab('pending-sharing')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'pending-sharing'
+                    ? 'border-teal-500 text-teal-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Yêu cầu chờ tôi duyệt
+              </button>
             </nav>
           </div>
 
           <div className="p-6">
             {activeTab === 'requests' && <MyRentalRequests />}
             {activeTab === 'invoices' && <PendingInvoices />}
+            {activeTab === 'my-sharing' && <MySharingRequests />}
+            {activeTab === 'pending-sharing' && <UserASharingRequests />}
           </div>
         </div>
       </div>

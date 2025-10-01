@@ -7,7 +7,8 @@ export interface RentalRequest {
   landlordId: number;
   roomId: number;
   postId: number;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestType?: 'rental' | 'room_sharing';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'pending_user_approval' | 'pending_landlord_approval';
   message?: string;
   requestedMoveInDate: string;
   requestedDuration: number;
@@ -40,7 +41,7 @@ export interface RentalRequestsResponse {
  * Lấy danh sách đăng ký thuê của user
  */
 export async function getUserRentalRequests(): Promise<RentalRequest[]> {
-  return apiGet("users/rental-requests");
+  return apiGet("users/me/rental-requests");
 }
 
 /**
@@ -58,6 +59,13 @@ export async function cancelRentalRequest(requestId: number): Promise<{ message:
 }
 
 // ==================== CONTRACTS API ====================
+
+/**
+ * Lấy danh sách tất cả contracts của user
+ */
+export async function getUserContracts(): Promise<any[]> {
+  return apiGet("users/contracts");
+}
 
 /**
  * Lấy chi tiết hợp đồng
@@ -120,7 +128,9 @@ export function formatRentalStatus(status: string): string {
     'pending': 'Chờ duyệt',
     'approved': 'Đã duyệt',
     'rejected': 'Từ chối',
-    'cancelled': 'Đã hủy'
+    'cancelled': 'Đã hủy',
+    'pending_user_approval': 'Chờ người ở duyệt',
+    'pending_landlord_approval': 'Chờ chủ nhà duyệt'
   };
   return statusMap[status as keyof typeof statusMap] || status;
 }

@@ -8,6 +8,7 @@ import { searchPostToUnified, shuffleArray } from "@/types/MixedPosts";
 import PostCard from "@/components/common/PostCard";
 import { getMyProfile, UserProfile } from "@/services/userProfiles";
 import { rankPosts, PostRankingOptions } from "../../services/postRanking";
+import { checkMultiplePostsVisibility } from "@/utils/roomVisibility";
 
 export default function Suggestions() {
   const [items, setItems] = useState<any[]>([]);
@@ -41,14 +42,30 @@ export default function Suggestions() {
           ? response.posts
           : [];
 
-        const unified = await Promise.all(
-          shuffleArray(allPosts).slice(0, 20).map(async (post: any) => {
-            let roomData: any = null;
-            if (post.roomId) {
+        // Fetch room data for all posts first
+        const roomDataMap: Record<string, any> = {};
+        await Promise.all(
+          allPosts
+            .filter(post => post.roomId)
+            .map(async (post: any) => {
               try {
-                roomData = await getRoomById(post.roomId);
-              } catch {}
-            }
+                const roomData = await getRoomById(post.roomId);
+                roomDataMap[post.roomId] = roomData;
+              } catch (error) {
+                // Room data không tải được, sẽ skip post này
+              }
+            })
+        );
+
+        // Filter posts based on room visibility logic
+        const visibilityResults = checkMultiplePostsVisibility(allPosts, roomDataMap);
+        const visiblePosts = visibilityResults
+          .filter(result => result.shouldShow)
+          .map(result => result.post);
+
+        const unified = await Promise.all(
+          shuffleArray(visiblePosts).slice(0, 20).map(async (post: any) => {
+            const roomData = roomDataMap[post.roomId] || null;
             return searchPostToUnified(post, roomData);
           })
         );

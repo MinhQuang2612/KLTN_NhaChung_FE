@@ -9,13 +9,28 @@ import {
   getRentalRequestStatusColor,
   LandlordRentalRequest 
 } from "@/services/landlord";
+import { 
+  getLandlordSharingRequests,
+  approveSharingRequestByLandlord,
+  rejectSharingRequestByLandlord,
+  RoomSharingRequest 
+} from "@/services/roomSharing";
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ToastMessages } from "@/utils/toastMessages";
 
 export default function LandlordRentalRequests() {
+  const [activeTab, setActiveTab] = useState<'rental' | 'sharing'>('rental');
+  
+  // Rental requests state
   const [requests, setRequests] = useState<LandlordRentalRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rentalLoading, setRentalLoading] = useState(true);
+  
+  // Room sharing requests state
+  const [sharingRequests, setSharingRequests] = useState<RoomSharingRequest[]>([]);
+  const [sharingLoading, setSharingLoading] = useState(true);
+  
+  // Common state
   const [processingRequests, setProcessingRequests] = useState<Set<number>>(new Set());
   const [responseMessages, setResponseMessages] = useState<Record<number, string>>({});
   const [selectedRequest, setSelectedRequest] = useState<LandlordRentalRequest | null>(null);
@@ -24,19 +39,95 @@ export default function LandlordRentalRequests() {
   const { user } = useAuth();
 
   useEffect(() => {
-    loadRequests();
+    loadRentalRequests();
+    loadSharingRequests();
   }, []);
 
-  const loadRequests = async () => {
+  const loadRentalRequests = async () => {
     try {
-      setLoading(true);
+      setRentalLoading(true);
       const data = await getLandlordRentalRequests();
-      setRequests(data);
+      
+      // Debug: Log để kiểm tra data từ API
+      console.log('🔍 [DEBUG] Raw data from getLandlordRentalRequests:', data);
+      console.log('🔍 [DEBUG] Data length:', data.length);
+      
+      // Debug: Log từng request để xem status và requestType
+      data.forEach((request, index) => {
+        console.log(`🔍 [DEBUG] Request #${index + 1}:`, {
+          requestId: request.requestId,
+          status: request.status,
+          message: request.message,
+          tenantId: request.tenantId,
+          requestType: (request as any).requestType, // Check if requestType exists
+          fullObject: request // Log toàn bộ object để xem có field nào khác
+        });
+      });
+      
+      // Filter chỉ hiển thị rental requests thực sự (không phải room sharing requests)
+      // Dựa vào requestType: 'room_sharing' = room sharing, không có hoặc khác = rental
+      const rentalRequests = data.filter(request => {
+        const requestType = (request as any).requestType;
+        return requestType !== 'room_sharing';
+      });
+      
+      console.log('🔍 [DEBUG] Filtered rental requests:', rentalRequests);
+      console.log('🔍 [DEBUG] Filtered length:', rentalRequests.length);
+      
+      setRequests(rentalRequests);
     } catch (error: any) {
       const message = ToastMessages.error.load('Danh sách yêu cầu thuê');
       showError(message.title, error.message || message.message);
     } finally {
-      setLoading(false);
+      setRentalLoading(false);
+    }
+  };
+
+  const loadSharingRequests = async () => {
+    try {
+      setSharingLoading(true);
+      
+      // Thử gọi API riêng trước
+      try {
+        const sharingData = await getLandlordSharingRequests();
+        console.log('🔍 [DEBUG] Raw data from getLandlordSharingRequests:', sharingData);
+        console.log('🔍 [DEBUG] Sharing data length:', sharingData.length);
+        
+        if (sharingData.length > 0) {
+          // Nếu API riêng có data, dùng nó
+          setSharingRequests(sharingData);
+          return;
+        }
+      } catch (error) {
+        console.log('🔍 [DEBUG] getLandlordSharingRequests failed, falling back to getLandlordRentalRequests');
+      }
+      
+      // Fallback: Lấy từ getLandlordRentalRequests và filter
+      const data = await getLandlordRentalRequests();
+      
+      // Filter chỉ hiển thị room sharing requests dựa vào requestType
+      const sharingRequests = data.filter(request => {
+        const requestType = (request as any).requestType;
+        return requestType === 'room_sharing';
+      });
+      
+      console.log('🔍 [DEBUG] Sharing requests from rental API:', sharingRequests);
+      console.log('🔍 [DEBUG] Sharing requests length:', sharingRequests.length);
+      
+      // Convert LandlordRentalRequest to RoomSharingRequest format
+      const convertedSharingRequests = sharingRequests.map(request => ({
+        ...request,
+        posterId: request.tenantId,
+        requestType: 'room_sharing' as const,
+        status: request.status as any // Cast để tạm thời giải quyết type mismatch
+      }));
+      
+      setSharingRequests(convertedSharingRequests as any);
+    } catch (error: any) {
+      const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
+      showError(message.title, error.message || message.message);
+    } finally {
+      setSharingLoading(false);
     }
   };
 
@@ -54,7 +145,7 @@ export default function LandlordRentalRequests() {
       showSuccess(message.title, 'Đã duyệt yêu cầu thuê thành công');
       
       // Reload requests
-      await loadRequests();
+      await loadRentalRequests();
     } catch (error: any) {
       const message = ToastMessages.error.update('Yêu cầu thuê');
       showError(message.title, error.message || message.message);
@@ -81,7 +172,7 @@ export default function LandlordRentalRequests() {
       showSuccess(message.title, 'Đã từ chối yêu cầu thuê');
       
       // Reload requests
-      await loadRequests();
+      await loadRentalRequests();
     } catch (error: any) {
       const message = ToastMessages.error.update('Yêu cầu thuê');
       showError(message.title, error.message || message.message);
@@ -104,6 +195,51 @@ export default function LandlordRentalRequests() {
   const handleViewDetail = (request: LandlordRentalRequest) => {
     setSelectedRequest(request);
     setShowDetailModal(true);
+  };
+
+  // Room sharing request handlers
+  const handleApproveSharing = async (requestId: number) => {
+    try {
+      setProcessingRequests(prev => new Set(prev).add(requestId));
+      
+      const result = await approveSharingRequestByLandlord(requestId);
+      
+      const message = ToastMessages.success.update('Yêu cầu ở ghép');
+      showSuccess(message.title, 'Đã duyệt yêu cầu ở ghép thành công! Hợp đồng đã được tạo và người ở ghép đã được thêm vào phòng.');
+      
+      await loadSharingRequests();
+    } catch (error: any) {
+      const message = ToastMessages.error.update('Yêu cầu ở ghép');
+      showError(message.title, error.message || message.message);
+    } finally {
+      setProcessingRequests(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(requestId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRejectSharing = async (requestId: number) => {
+    try {
+      setProcessingRequests(prev => new Set(prev).add(requestId));
+      
+      await rejectSharingRequestByLandlord(requestId);
+      
+      const message = ToastMessages.success.update('Yêu cầu ở ghép');
+      showSuccess(message.title, 'Đã từ chối yêu cầu ở ghép.');
+      
+      await loadSharingRequests();
+    } catch (error: any) {
+      const message = ToastMessages.error.update('Yêu cầu ở ghép');
+      showError(message.title, error.message || message.message);
+    } finally {
+      setProcessingRequests(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(requestId);
+        return newSet;
+      });
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -139,29 +275,76 @@ export default function LandlordRentalRequests() {
     ).join(' ');
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-4">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
-        </div>
-      </div>
-    );
-  }
+  const getSharingStatusText = (status: string): string => {
+    switch (status) {
+      case 'pending_landlord_approval': return 'Chờ tôi duyệt';
+      case 'approved': return 'Đã duyệt';
+      case 'rejected': return 'Đã từ chối';
+      default: return status;
+    }
+  };
+
+  const getSharingStatusColor = (status: string): string => {
+    switch (status) {
+      case 'pending_landlord_approval': return 'bg-yellow-100 text-yellow-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const isLoading = activeTab === 'rental' ? rentalLoading : sharingLoading;
 
   // Thống kê
-  const stats = {
+  const rentalStats = {
     total: requests.length,
     pending: requests.filter(r => r.status === 'pending').length,
     approved: requests.filter(r => r.status === 'approved').length,
-    rejected: requests.filter(r => r.status === 'rejected').length,
+    rejected: requests.filter(r => r.status === 'rejected' || r.status === 'cancelled').length,
   };
+
+  const sharingStats = {
+    total: sharingRequests.length,
+    pending: sharingRequests.filter(r => r.status === 'pending_user_approval' || r.status === 'pending_landlord_approval').length,
+    approved: sharingRequests.filter(r => r.status === 'approved').length,
+    rejected: sharingRequests.filter(r => r.status === 'rejected').length,
+  };
+
+  const currentStats = activeTab === 'rental' ? rentalStats : sharingStats;
 
   return (
     <div className="container mx-auto p-4">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Quản lý yêu cầu thuê</h1>
-        <p className="text-gray-600">Xem và xử lý các yêu cầu thuê phòng từ người dùng</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Quản lý yêu cầu</h1>
+        <p className="text-gray-600">Xem và xử lý các yêu cầu thuê phòng và ở ghép từ người dùng</p>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('rental')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'rental'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Yêu cầu thuê ({rentalStats.total})
+            </button>
+            <button
+              onClick={() => setActiveTab('sharing')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'sharing'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Yêu cầu ở ghép ({sharingStats.total})
+            </button>
+          </nav>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -175,7 +358,7 @@ export default function LandlordRentalRequests() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Tổng yêu cầu</p>
-              <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-xl font-bold text-gray-900">{currentStats.total}</p>
             </div>
           </div>
         </div>
@@ -189,7 +372,7 @@ export default function LandlordRentalRequests() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Chờ duyệt</p>
-              <p className="text-xl font-bold text-gray-900">{stats.pending}</p>
+              <p className="text-xl font-bold text-gray-900">{currentStats.pending}</p>
             </div>
           </div>
         </div>
@@ -203,7 +386,7 @@ export default function LandlordRentalRequests() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Đã duyệt</p>
-              <p className="text-xl font-bold text-gray-900">{stats.approved}</p>
+              <p className="text-xl font-bold text-gray-900">{currentStats.approved}</p>
             </div>
           </div>
         </div>
@@ -217,13 +400,18 @@ export default function LandlordRentalRequests() {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Đã từ chối</p>
-              <p className="text-xl font-bold text-gray-900">{stats.rejected}</p>
+              <p className="text-xl font-bold text-gray-900">{currentStats.rejected}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {requests.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+        </div>
+      ) : activeTab === 'rental' ? (
+        requests.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-24 h-24 mx-auto mb-4 text-gray-300">
             <svg fill="currentColor" viewBox="0 0 20 20">
@@ -287,6 +475,89 @@ export default function LandlordRentalRequests() {
             </div>
           ))}
         </div>
+      )
+      ) : (
+        // Room sharing requests
+        sharingRequests.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-24 h-24 mx-auto mb-4 text-gray-300">
+              <svg fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có yêu cầu ở ghép nào</h3>
+            <p className="text-gray-500">Các yêu cầu ở ghép từ người dùng sẽ hiển thị tại đây</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sharingRequests.map((request) => (
+              <div key={request.requestId} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Yêu cầu ở ghép #{request.requestId}
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSharingStatusColor(request.status)}`}>
+                        {getSharingStatusText(request.status)}
+                      </span>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-3 gap-4 text-sm text-gray-600">
+                      <div>
+                        <p><strong>Phòng:</strong> {request.roomId}</p>
+                        <p><strong>Người ở ghép:</strong> {request.tenantId}</p>
+                      </div>
+                      <div>
+                        <p><strong>Ngày dọn vào:</strong> {formatDate(request.requestedMoveInDate)}</p>
+                        <p><strong>Thời hạn:</strong> {request.requestedDuration} tháng</p>
+                      </div>
+                      <div>
+                        <p><strong>Ngày gửi:</strong> {formatDate(request.createdAt)}</p>
+                        {request.contractId && (
+                          <p><strong>Hợp đồng:</strong> #{request.contractId}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {request.message && (
+                      <div className="mt-3 p-2 bg-blue-50 rounded text-sm">
+                        <span className="font-medium text-blue-900">Lời nhắn: </span>
+                        <span className="text-blue-800">{request.message}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 ml-4">
+                    {request.status === 'pending_landlord_approval' && (
+                      <>
+                        <button
+                          onClick={() => handleRejectSharing(request.requestId)}
+                          disabled={processingRequests.has(request.requestId)}
+                          className="px-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          Từ chối
+                        </button>
+                        <button
+                          onClick={() => handleApproveSharing(request.requestId)}
+                          disabled={processingRequests.has(request.requestId)}
+                          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {processingRequests.has(request.requestId) ? 'Đang xử lý...' : 'Duyệt'}
+                        </button>
+                      </>
+                    )}
+                    {request.status === 'approved' && request.contractId && (
+                      <span className="text-sm text-green-600 font-medium">
+                        ✅ Đã tạo hợp đồng
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Detail Modal */}
