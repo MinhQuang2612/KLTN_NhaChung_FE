@@ -9,8 +9,10 @@ import { getMyProfile, UserProfile } from "@/services/userProfiles";
 import { rankPosts, PostRankingOptions } from "@/services/postRanking";
 import { useAuth } from "@/contexts/AuthContext";
 import { checkMultiplePostsVisibility } from "@/utils/roomVisibility";
+import { nlpSearch, NlpSearchItem } from "@/services/nlpSearch";
+import { extractApiErrorMessage } from "@/utils/api";
 
-type SortKey = "random" | "newest" | "priceAsc" | "priceDesc" | "areaDesc";
+type SortKey = "random" | "newest" | "priceAsc" | "priceDesc" | "areaDesc" | "nearest";
 
 export default function RoomList() {
   const [items, setItems] = useState<UnifiedPost[]>([]);
@@ -18,11 +20,13 @@ export default function RoomList() {
   const [err, setErr] = useState<string>("");
   const [sort, setSort] = useState<SortKey>("random");
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activeBadges, setActiveBadges] = useState<string[]>([]);
+  const [query, setQuery] = useState<string>("");
   const { user } = useAuth();
 
-  // pagination 3x3
+  // pagination 4x4
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9;
+  const itemsPerPage = 16;
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +42,31 @@ export default function RoomList() {
         } catch {}
 
         // Gọi unified search API để lấy tất cả posts
-        const searchResponse = await searchPosts();
+        const url = new URL((typeof window !== 'undefined') ? window.location.href : 'http://localhost');
+        const q = url.searchParams.get('q') || "";
+        setQuery(q);
+
+        let searchResponse: any = null;
+        if (q.trim()) {
+          try {
+            const nlpRes = await nlpSearch({ q });
+            searchResponse = Array.isArray(nlpRes) ? { posts: nlpRes } : nlpRes;
+          } catch (e: any) {
+            // Xử lý lỗi: 400 thiếu q, 500 nội bộ, 408 timeout
+            const status = (e as any)?.status;
+            if (status === 400) {
+              setErr("Vui lòng nhập truy vấn để tìm kiếm.");
+            } else if (status === 408) {
+              setErr("Hệ thống bận, vui lòng thử lại.");
+            } else {
+              setErr(extractApiErrorMessage(e));
+            }
+            searchResponse = { posts: [] };
+          }
+        } else {
+          // Fallback: lấy danh sách tổng hợp cũ nếu chưa gõ truy vấn
+          searchResponse = await searchPosts();
+        }
         
         // Xử lý kết quả từ search API
         const allPosts = Array.isArray(searchResponse)
@@ -51,7 +79,7 @@ export default function RoomList() {
         const roomDataMap: Record<string, any> = {};
         await Promise.all(
           allPosts
-            .filter(post => post.roomId)
+            .filter((post: any) => post.roomId)
             .map(async (post: any) => {
               try {
                 const roomData = await getRoomById(post.roomId);
@@ -65,8 +93,8 @@ export default function RoomList() {
         // Filter posts based on room visibility logic
         const visibilityResults = checkMultiplePostsVisibility(allPosts, roomDataMap);
         const visiblePosts = visibilityResults
-          .filter(result => result.shouldShow)
-          .map(result => result.post);
+          .filter((result: any) => result.shouldShow)
+          .map((result: any) => result.post);
 
         // Convert to unified format
         const unifiedPosts: UnifiedPost[] = visiblePosts.map((post: any) => {
@@ -83,6 +111,8 @@ export default function RoomList() {
           let bedrooms = undefined;
           let bathrooms = undefined;
           let images = post.images || [];
+          const distance = (post as NlpSearchItem)?.distance;
+          const score = (post as NlpSearchItem)?.score;
           
           if (roomData) {
             price = roomData.price || 0;
@@ -113,7 +143,7 @@ export default function RoomList() {
             bathrooms: bathrooms,
             isVerified: false,
             createdAt: post.createdAt,
-            originalData: post
+            originalData: { ...post, distance, score }
           };
         });
         
@@ -134,6 +164,13 @@ export default function RoomList() {
         if (!cancelled) {
           setItems(shuffledPosts);
           setCurrentPage(1);
+          // badges tự suy luận đơn giản từ q
+          const badges: string[] = [];
+          if (q.includes("triệu")) badges.push("Giá");
+          if (q.match(/\b(m2|m²|m\^2)\b/i)) badges.push("Diện tích");
+          if (q.includes("bao điện nước") || q.includes("bao điện") || q.includes("bao nước")) badges.push("Bao điện nước");
+          if (q.includes("gần") || q.includes("quận") || q.includes("phường") || q.includes("tại")) badges.push("Vị trí");
+          setActiveBadges(badges);
         }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || "Không tải được danh sách");
@@ -146,6 +183,89 @@ export default function RoomList() {
     };
   }, []);
 
+  // Lắng nghe event từ SearchDetails
+  useEffect(() => {
+    const handler = (ev: any) => {
+      const value = ev?.detail?.q || "";
+      setQuery(value);
+      // Triggers reload
+      (async () => {
+        try {
+          setLoading(true);
+          setErr("");
+          const nlpRes = value.trim() ? await nlpSearch({ q: value }) : await searchPosts();
+          const allPosts = Array.isArray(nlpRes) ? nlpRes : (Array.isArray((nlpRes as any)?.posts) ? (nlpRes as any).posts : []);
+          const roomDataMap: Record<string, any> = {};
+          await Promise.all(allPosts.filter((p: any) => p.roomId).map(async (p: any) => {
+            try { roomDataMap[p.roomId] = await getRoomById(p.roomId); } catch {}
+          }));
+          const visibilityResults = checkMultiplePostsVisibility(allPosts, roomDataMap);
+          const visiblePosts = visibilityResults.filter(v => v.shouldShow).map(v => v.post);
+          const unified: UnifiedPost[] = visiblePosts.map((post: any) => {
+            const mappedPostType = post.postType === 'cho-thue' ? 'rent' : post.postType === 'tim-o-ghep' ? 'roommate' : post.postType;
+            const roomData = roomDataMap[post.roomId];
+            const distance = (post as NlpSearchItem)?.distance;
+            const score = (post as NlpSearchItem)?.score;
+            let price = 0, area = 0, location = 'Chưa xác định', address: any = undefined, bedrooms: any = undefined, bathrooms: any = undefined, images = post.images || [];
+            if (roomData) {
+              price = roomData.price || 0;
+              area = roomData.area || 0;
+              location = roomData.address ? `${roomData.address.ward}, ${roomData.address.city}` : 'Chưa xác định';
+              address = roomData.address;
+              bedrooms = roomData.chungCuInfo?.bedrooms || roomData.nhaNguyenCanInfo?.bedrooms;
+              bathrooms = roomData.chungCuInfo?.bathrooms || roomData.nhaNguyenCanInfo?.bathrooms;
+              images = roomData.images?.length > 0 ? roomData.images : (post.images || []);
+            }
+            return {
+              id: post.postId,
+              type: (mappedPostType as any) || 'rent',
+              title: post.title || 'Không có tiêu đề',
+              description: post.description || 'Không có mô tả',
+              images,
+              price,
+              area,
+              location,
+              address,
+              category: post.category || mappedPostType,
+              photoCount: images.length + (post.videos?.length || 0),
+              bedrooms,
+              bathrooms,
+              isVerified: false,
+              createdAt: post.createdAt,
+              originalData: { ...post, distance, score },
+            } as UnifiedPost;
+          });
+          const selectedCityLS = (typeof window !== 'undefined') ? localStorage.getItem('selectedCity') || '' : '';
+          const userCity = (user as any)?.address?.city || (user as any)?.city || '';
+          const cityToFilter = profile?.preferredCity || selectedCityLS || userCity;
+          const opts: PostRankingOptions = { profileCity: cityToFilter, strictCityFilter: false };
+          const { ranked } = rankPosts(unified, profile, opts);
+          const rankedOut = ranked.map(({ _score, _price, _cityMatch, _cityScore, ...rest }) => rest as UnifiedPost);
+          setItems(rankedOut);
+          const badges: string[] = [];
+          if (value.includes("triệu")) badges.push("Giá");
+          if (value.match(/\b(m2|m²|m\^2)\b/i)) badges.push("Diện tích");
+          if (value.includes("bao điện nước") || value.includes("bao điện") || value.includes("bao nước")) badges.push("Bao điện nước");
+          if (value.includes("gần") || value.includes("quận") || value.includes("phường") || value.includes("tại")) badges.push("Vị trí");
+          setActiveBadges(badges);
+          setCurrentPage(1);
+        } catch (e: any) {
+          setErr(extractApiErrorMessage(e));
+        } finally {
+          setLoading(false);
+        }
+      })();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('app:nlp-search' as any, handler as any);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('app:nlp-search' as any, handler as any);
+      }
+    };
+  }, [profile, user]);
+
   // sort client-side
   const sorted = useMemo(() => {
     const a = [...items];
@@ -153,6 +273,13 @@ export default function RoomList() {
       case "random":
         // Giữ nguyên thứ tự shuffle từ API load
         return a;
+      case "nearest":
+        a.sort((x, y) => {
+          const dx = (x.originalData as any)?.distance ?? Number.POSITIVE_INFINITY;
+          const dy = (y.originalData as any)?.distance ?? Number.POSITIVE_INFINITY;
+          return dx - dy;
+        });
+        break;
       case "priceAsc":
         a.sort(
           (x, y) => {
@@ -181,7 +308,7 @@ export default function RoomList() {
     return a;
   }, [items, sort]);
 
-  // paginate 3x3
+  // paginate 4x4
   const totalPages = Math.max(1, Math.ceil(sorted.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, sorted.length);
@@ -220,21 +347,47 @@ export default function RoomList() {
             <option value="priceAsc">Giá tăng dần</option>
             <option value="priceDesc">Giá giảm dần</option>
             <option value="areaDesc">Diện tích</option>
+            <option value="nearest">Gần nhất</option>
           </select>
         </div>
       </div>
 
+      {/* Badges tiêu chí */}
+      {activeBadges.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {activeBadges.map((b) => (
+            <span key={b} className="px-2 py-1 text-xs rounded-md bg-teal-50 text-teal-700 border border-teal-200">{b}</span>
+          ))}
+        </div>
+      )}
+
       {/* States */}
       {loading && <div className="text-gray-600">Đang tải…</div>}
-      {err && !loading && <div className="text-red-600">{err}</div>}
+      {err && !loading && (
+        <div className="flex items-center justify-between bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded">
+          <span>{err}</span>
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                const val = url.searchParams.get('q') || '';
+                window.dispatchEvent(new CustomEvent('app:nlp-search', { detail: { q: val } }));
+              }
+            }}
+            className="text-sm font-medium underline hover:text-red-800"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
       {!loading && !err && current.length === 0 && (
         <div className="text-gray-600">Không có bài đăng nào.</div>
       )}
 
-      {/* Grid */}
+      {/* Grid - Layout 4x4 */}
       {!loading && !err && current.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {current.map((it) => (
               <PostCard 
                 key={`${it.type}-${it.id}`} 

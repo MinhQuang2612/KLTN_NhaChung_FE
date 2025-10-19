@@ -1,14 +1,29 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getMyProfile, UserProfile } from "@/services/userProfiles";
 
-const ALL_CHIPS = [
-  "Phường Hạnh Thông",
-  "Có gác",
-  "Giá dưới 5 triệu",
-  "Phường Bến Thành",
+// Filter cơ bản (luôn hiển thị)
+const BASE_CHIPS = [
+  "Giá dưới 3 triệu",
+  "Giá từ 3-5 triệu", 
+  "Giá từ 5-10 triệu",
+  "Diện tích trên 20m²",
+  "Diện tích trên 30m²",
+  "Có máy lạnh",
   "Có ban công",
+  "Có gác",
+  "Bao điện nước",
   "2 phòng ngủ",
-  "Máy lạnh",
+  "3 phòng ngủ",
+];
+
+// Filter đơn giản (ít hơn)
+const SIMPLIFIED_CHIPS = [
+  "Giá dưới 5 triệu",
+  "Có máy lạnh",
+  "Gần Quận 1",
+  "Phòng trọ",
 ];
 
 const FILTER_OPTIONS = {
@@ -18,10 +33,27 @@ const FILTER_OPTIONS = {
   demand: ["Nam", "Nữ", "Nam/Nữ", "Tất cả"]
 };
 
-export default function SearchDetails() {
+export default function SearchDetails({
+  hideChips = false,
+  hideRecentSearches = false,
+  simplifiedChips = false,
+  hideTitles = false,
+  hideWrapper = false,
+}: {
+  hideChips?: boolean;
+  hideRecentSearches?: boolean;
+  simplifiedChips?: boolean;
+  hideTitles?: boolean;
+  hideWrapper?: boolean;
+} = {}) {
+  const { user } = useAuth();
   const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
+  const debounceMs = 400;
+  const timerRef = useRef<any>(null);
+  const isFirstLoadRef = useRef(true);
+  const [selected, setSelected] = useState<string[]>([]); // Tắt filter sẵn
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeFilters, setActiveFilters] = useState({
     rentType: "Tất cả",
     roomType: "Tất cả",
@@ -29,8 +61,111 @@ export default function SearchDetails() {
     demand: "Tất cả"
   });
 
+  // Sinh filter dựa trên profile user
+  const personalizedChips = useMemo(() => {
+    if (simplifiedChips) return SIMPLIFIED_CHIPS;
+    
+    const chips = [...BASE_CHIPS];
+    
+    // Chỉ sinh filter cá nhân hóa khi có user và profile
+    if (user && profile) {
+      // Filter theo thành phố
+      if (profile.preferredCity) {
+        const cityName = profile.preferredCity.replace(/TP\.|Thành phố\s*/i, '').trim();
+        chips.unshift(`Gần ${cityName}`);
+        chips.unshift(`Phường ${cityName}`);
+      }
+      
+      // Filter theo giới tính (cho ở ghép)
+      if (profile.gender) {
+        if (profile.gender === 'male') {
+          chips.push("Ở ghép nam");
+        } else if (profile.gender === 'female') {
+          chips.push("Ở ghép nữ");
+        }
+      }
+      
+      // Filter theo ngân sách
+      if (profile.budgetRange?.max) {
+        if (profile.budgetRange.max < 3000000) {
+          chips.unshift("Giá dưới 2 triệu");
+        } else if (profile.budgetRange.max < 5000000) {
+          chips.unshift("Giá dưới 4 triệu");
+        } else if (profile.budgetRange.max < 10000000) {
+          chips.unshift("Giá dưới 8 triệu");
+        }
+      }
+      
+      // Filter theo quận/phường ưa thích
+      if (profile.preferredDistricts?.length) {
+        profile.preferredDistricts.slice(0, 2).forEach(district => {
+          chips.unshift(`Quận ${district}`);
+        });
+      }
+      
+      if (profile.preferredWards?.length) {
+        profile.preferredWards.slice(0, 2).forEach(ward => {
+          chips.unshift(`Phường ${ward}`);
+        });
+      }
+      
+      // Filter theo loại phòng ưa thích
+      if (profile.roomType?.length) {
+        profile.roomType.forEach(type => {
+          if (type === 'phong-tro') chips.push("Phòng trọ");
+          else if (type === 'chung-cu') chips.push("Chung cư");
+          else if (type === 'nha-nguyen-can') chips.push("Nhà nguyên căn");
+        });
+      }
+      
+      // Filter theo tiện ích ưa thích
+      if (profile.amenities?.length) {
+        profile.amenities.forEach(amenity => {
+          if (amenity === 'air_conditioning') chips.push("Có máy lạnh");
+          else if (amenity === 'balcony') chips.push("Có ban công");
+          else if (amenity === 'parking') chips.push("Có chỗ đỗ xe");
+          else if (amenity === 'elevator') chips.push("Có thang máy");
+        });
+      }
+      
+      // Filter theo lifestyle
+      if (profile.lifestyle === 'quiet') {
+        chips.push("Yên tĩnh");
+      } else if (profile.lifestyle === 'social') {
+        chips.push("Năng động");
+      }
+    }
+    
+    return chips;
+  }, [profile, user, simplifiedChips]);
+
+  // Load profile khi component mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const userProfile = await getMyProfile();
+        setProfile(userProfile as any);
+      } catch (error) {
+        // Không có profile, dùng filter cơ bản
+      }
+    })();
+  }, []);
+
   const toggle = (name: string) => {
     setSelected((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));
+  };
+
+  const pushQueryToUrl = (value: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (value.trim()) url.searchParams.set('q', value.trim());
+    else url.searchParams.delete('q');
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  const emitSearchEvent = (value: string) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('app:nlp-search', { detail: { q: value.trim() } }));
   };
 
   const handleSearch = () => {
@@ -50,8 +185,35 @@ export default function SearchDetails() {
       });
     }
     
-    // Trigger search action
+    pushQueryToUrl(q);
+    emitSearchEvent(q);
   };
+
+  // Load q từ URL khi vào trang hoặc khi back/forward
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const initialQ = url.searchParams.get('q') || "";
+    setQ(initialQ);
+  }, []);
+
+  // Debounce khi gõ
+  useEffect(() => {
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      if (q) {
+        pushQueryToUrl(q);
+        emitSearchEvent(q);
+      }
+      return;
+    }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      pushQueryToUrl(q);
+      if (q.trim()) emitSearchEvent(q);
+    }, debounceMs);
+    return () => timerRef.current && clearTimeout(timerRef.current);
+  }, [q]);
 
   const clearFilters = () => {
     setSelected([]); // Xóa chips được chọn
@@ -78,11 +240,10 @@ export default function SearchDetails() {
     }));
   };
 
-  return (
-    <section className="relative bg-gray-50 pt-12 pb-6" data-search-details>
-      {/* Main content */}
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 w-full">
-        {/* Breadcrumbs */}
+  const content = (
+    <>
+      {/* Breadcrumbs */}
+      {!hideTitles && (
         <div className="text-sm text-gray-600 mb-4">
           <span className="hover:text-teal-600 cursor-pointer">Nhà chung</span>
           <span className="mx-2">/</span>
@@ -90,16 +251,19 @@ export default function SearchDetails() {
           <span className="mx-2">/</span>
           <span className="text-gray-800 font-medium">Phòng trọ Quận Gò Vấp</span>
         </div>
+      )}
 
-        {/* Main heading */}
+      {/* Main heading */}
+      {!hideTitles && (
         <div className="mb-4">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
             Hơn 500 phòng trọ ở Quận Gò Vấp cập nhật 07/2025
           </h1>
         </div>
+      )}
 
-        {/* Search card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 w-full border border-gray-200">
+      {/* Search card */}
+      <div className="bg-white rounded-2xl shadow-lg p-6 w-full border border-gray-200">
           <div className="flex gap-3 mb-4">
             <div className="flex-1 relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -221,60 +385,75 @@ export default function SearchDetails() {
           </div>
 
           {/* Filter chips (gợi ý tìm kiếm) */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {ALL_CHIPS.map((c) => {
-              const active = selected.includes(c);
-              return (
-                <button
-                  key={c}
-                  onClick={() => toggle(c)}
-                  aria-pressed={active}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 select-none ${
-                    active
-                      ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-md ring-1 ring-teal-500/30 hover:from-teal-600 hover:to-teal-700"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-800 border border-gray-200"
-                  }`}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
+          {!hideChips && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {personalizedChips.map((c) => {
+                const active = selected.includes(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => toggle(c)}
+                    aria-pressed={active}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-300 select-none ${
+                      active
+                        ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-md ring-1 ring-teal-500/30 hover:from-teal-600 hover:to-teal-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-800 border border-gray-200"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Recent searches and clear filters */}
-          <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
-            {recentSearches.length > 0 ? (
-              <>
+          {!hideRecentSearches && (
+            <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
+              {recentSearches.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                    <span className="font-medium">Đã tìm gần đây:</span>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {recentSearches.map((r, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleRecentClick(r)}
+                        className="px-2 py-1 bg-gray-100 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-200 hover:text-gray-800 transition-colors cursor-pointer"
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
                 <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                  <span className="font-medium">Đã tìm gần đây:</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  <span className="font-medium text-gray-500">Chưa có tìm kiếm gần đây</span>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  {recentSearches.map((r, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleRecentClick(r)}
-                      className="px-2 py-1 bg-gray-100 rounded-md text-gray-700 border border-gray-200 hover:bg-gray-200 hover:text-gray-800 transition-colors cursor-pointer"
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                <span className="font-medium text-gray-500">Chưa có tìm kiếm gần đây</span>
-              </div>
-            )}
-            <button 
-              onClick={clearFilters} 
-              className="ml-auto text-teal-600 hover:text-teal-700 font-medium hover:underline transition-colors"
-            >
-              Xóa lọc
-            </button>
-          </div>
+              )}
+              <button 
+                onClick={clearFilters} 
+                className="ml-auto text-teal-600 hover:text-teal-700 font-medium hover:underline transition-colors"
+              >
+                Xóa lọc
+              </button>
+            </div>
+          )}
         </div>
+    </>
+  );
+
+  if (hideWrapper) {
+    return content;
+  }
+
+  return (
+    <section className="relative bg-gray-50 pt-12 pb-6" data-search-details>
+      <div className="mx-auto max-w-7xl px-6 lg:px-8 w-full">
+        {content}
       </div>
     </section>
   );

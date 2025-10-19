@@ -19,6 +19,7 @@ export default function PostCard({
   city,
   price,
   isVerified,
+  distanceKm,
 }: RoomCardData) {
   const router = useRouter();
   const { isFavorited, toggleFavorite } = useFavorites();
@@ -157,9 +158,7 @@ export default function PostCard({
               clipRule="evenodd"
             />
           </svg>
-          {address
-            ? addressService.formatWardCity(address)
-            : (city || "")}
+          {address ? addressService.formatWardCity(address) : (city || "")}
         </div>
 
         {/* Giá */}
