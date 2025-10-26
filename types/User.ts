@@ -47,7 +47,7 @@ export interface VerificationData {
 export interface FaceMatchResult {
   match: boolean;
   similarity: number;
-  confidence?: 'high' | 'low';
+  confidence?: 'high' | 'low'; // Backend tự động tính dựa trên similarity
 }
 
 export interface VerificationResponse {
@@ -59,7 +59,7 @@ export interface VerificationResponse {
     submittedAt: string;
     idNumber: string;
     fullName: string;
-    faceMatchResult?: FaceMatchResult; // MỚI - Kết quả FaceMatch
+    faceMatchResult?: FaceMatchResult; // Backend tự động tính confidence
   };
 }
 
@@ -71,6 +71,6 @@ export interface VerificationStatus {
     submittedAt: string;
     reviewedAt?: string;
     adminNote?: string;
-    faceMatchResult?: FaceMatchResult; // MỚI - Kết quả FaceMatch
+    faceMatchResult?: FaceMatchResult; // Backend tự động tính confidence
   } | null;
 }

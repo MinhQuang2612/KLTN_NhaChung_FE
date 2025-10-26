@@ -154,14 +154,19 @@ export function getStatusMessage(result: FaceMatchResult): string {
   if (result.similarity >= 50) {
     return `✅ Face Match: ${result.similarity}% (High) - AUTO APPROVED`;
   } else {
-    return `❌ Face Match: ${result.similarity}% (Low) - PENDING`;
+    return `⚠️ Face Match: ${result.similarity}% (Low) - PENDING`;
   }
 }
 
 /**
  * Create FaceMatchResult for backend submission
  * Backend sẽ tự động tính confidence dựa trên similarity
+ * Frontend chỉ cần gửi match và similarity
  */
 export function createFaceMatchResult(match: boolean, similarity: number): FaceMatchResult {
-  return { match, similarity };
+  return { 
+    match, 
+    similarity 
+    // confidence sẽ được Backend tự động tính: "high" nếu similarity >= 50%, "low" nếu < 50%
+  };
 }
