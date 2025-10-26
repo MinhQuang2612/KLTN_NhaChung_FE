@@ -124,28 +124,7 @@ export default function RegisterFlow() {
       }
       const verifyResult = await verifyRegistration(form.email, otp);
       
-      // Debug: Kiểm tra kết quả từ backend
-      
-      // Nếu BE trả về token sau verify → LƯU local để dùng cho presign/upload, KHÔNG auto-login UI
-      if (typeof window !== "undefined" && verifyResult?.access_token && verifyResult?.user) {
-        localStorage.setItem("token", verifyResult.access_token);
-        localStorage.setItem("user", JSON.stringify(verifyResult.user));
-        // Không gọi refreshUser ở đây để tránh UI hiển thị là đã đăng nhập
-        // refreshUser sẽ được gọi sau khi hoàn tất survey
-
-        // Tạo profile cơ bản ngay sau OTP (theo yêu cầu BE)
-        try {
-          const { createProfile } = await import("@/services/userProfiles");
-          await createProfile({
-            userId: verifyResult.user.userId,
-            // Chỉ gửi thông tin cơ bản, survey sẽ bổ sung sau
-          });
-        } catch (profileError) {
-          // Không throw error, để survey xử lý
-        }
-      }
-
-      // Sau khi verify thành công, lưu thông tin đăng ký với userId thật (phục vụ survey flow)
+      // KHÔNG LƯU TOKEN - chỉ lưu thông tin đăng ký để dùng cho survey/verification
       if (typeof window !== "undefined") {
         localStorage.setItem("registrationData", JSON.stringify({
           name: form.name,
@@ -160,9 +139,15 @@ export default function RegisterFlow() {
         localStorage.setItem("isRegistrationFlow", "true");
       }
       
-      // Chuyển đến survey page
+      // Chuyển đến trang phù hợp theo role
       setTimeout(() => {
-        router.push(`/profile/survey?role=${form.role}`);
+        if (form.role === 'landlord') {
+          // Chủ nhà: chuyển đến trang xác thực
+          router.push('/verification/landlord');
+        } else {
+          // User thường: chuyển đến survey
+          router.push(`/profile/survey?role=${form.role}`);
+        }
       }, 100);
     } catch (e: any) {
       let errorMessage = extractApiErrorMessage(e);

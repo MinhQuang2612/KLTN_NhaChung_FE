@@ -6,42 +6,14 @@ export interface BudgetRange { min?: number; max?: number }
 export interface UserProfile {
   profileId?: number;
   userId?: number;
-  dateOfBirth?: string; // Format: YYYY-MM-DD
-  gender?: string; // Raw value from FE, no enum constraint
-  occupation?: string;
-  income?: number;
-  currentLocation?: string;
-  preferredDistricts?: string[];
-  preferredWards?: string[];
-  preferredWardCodes?: string[];
-  budgetRange?: BudgetRange;
-  roomType?: string[];
-  amenities?: string[];
-  lifestyle?: string; // Raw value from FE, no enum constraint
-  smoking?: boolean;
-  pets?: boolean;
-  cleanliness?: number;
-  socialLevel?: number;
-  // landlord specific
-  businessType?: string; // Raw value from FE, no enum constraint
-  experience?: string; // Raw value from FE, no enum constraint
-  propertyTypes?: string[];
-  targetDistricts?: string[];
-  targetWards?: string[];
-  targetWardCodes?: string[];
-  targetCityCode?: string;
-  targetCityName?: string;
+  
+  // Chỉ còn 6 trường theo yêu cầu
   preferredCity?: string;
-  priceRange?: BudgetRange;
-  targetTenants?: string[];
-  managementStyle?: string; // Raw value from FE, no enum constraint
-  responseTime?: string; // Raw value from FE, no enum constraint
-  additionalServices?: string[];
-  businessLicense?: string;
-  taxCode?: string;
-  bankAccount?: { bankName: string; accountNumber: string; accountHolder: string };
+  preferredWards?: string[];
+  roomType?: string[];
   contactMethod?: string[];
-  availableTime?: { weekdays?: string; weekends?: string };
+  occupation?: string;
+  pets?: boolean;
 }
 
 export function createProfile(data: UserProfile) {

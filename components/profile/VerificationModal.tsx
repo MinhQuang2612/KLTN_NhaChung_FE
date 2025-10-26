@@ -11,11 +11,12 @@ interface VerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerify: (data: VerificationData) => void;
+  skipAutoSubmit?: boolean; // Nếu true, chỉ gọi onVerify mà không submit thực sự
 }
 
 
 
-export default function VerificationModal({ isOpen, onClose, onVerify }: VerificationModalProps) {
+export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoSubmit = false }: VerificationModalProps) {
   const [step, setStep] = useState<'upload' | 'face' | 'review' | 'success'>('upload');
   const [formData, setFormData] = useState<Partial<VerificationData>>({});
   const [frontImage, setFrontImage] = useState<string>('');
@@ -172,6 +173,15 @@ export default function VerificationModal({ isOpen, onClose, onVerify }: Verific
 
     setIsSubmitting(true);
     try {
+      // Nếu skipAutoSubmit = true, chỉ gọi onVerify mà không submit thực sự
+      if (skipAutoSubmit) {
+        onVerify(normalized);
+        setStep('success');
+        // Không tự đóng modal, để parent điều khiển
+        return;
+      }
+
+      // Normal flow: submit verification
       const response = await submitVerification(normalized);
       
       // Hiển thị thông báo theo status từ backend - theo API guide mới

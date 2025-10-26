@@ -42,6 +42,7 @@ export interface VerificationData {
     backImage?: string;
     faceImage?: string;
   };
+  businessLicense?: string; // Base64 string for PDF/DOC (only for landlords)
 }
 
 export interface FaceMatchResult {
@@ -60,7 +61,9 @@ export interface VerificationResponse {
     idNumber: string;
     fullName: string;
     faceMatchResult?: FaceMatchResult; // Backend tự động tính confidence
+    businessLicense?: string; // S3 URL for business license
   };
+  businessLicenseUrl?: string; // S3 URL returned by backend
 }
 
 export interface VerificationStatus {
