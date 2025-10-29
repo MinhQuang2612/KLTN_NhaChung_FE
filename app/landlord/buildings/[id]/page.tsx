@@ -65,14 +65,16 @@ export default function BuildingDetailsPage() {
   }, [id]);
   
   // Refresh when window gains focus (e.g., returning from edit page)
+  // Tránh reload khi đang mở modal tạo phòng để không gây remount form
   useEffect(() => {
     const handleFocus = () => {
+      if (showCreate) return; // giữ nguyên form khi modal đang mở
       loadData();
     };
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [id]);
+  }, [id, showCreate]);
   
   useEffect(() => {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "auto" });

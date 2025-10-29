@@ -77,28 +77,28 @@ export default function SearchDetails({
       }
       
       // Filter theo giới tính (cho ở ghép)
-      if (profile.gender) {
-        if (profile.gender === 'male') {
+      if ((profile as any).gender) {
+        if ((profile as any).gender === 'male') {
           chips.push("Ở ghép nam");
-        } else if (profile.gender === 'female') {
+        } else if ((profile as any).gender === 'female') {
           chips.push("Ở ghép nữ");
         }
       }
       
       // Filter theo ngân sách
-      if (profile.budgetRange?.max) {
-        if (profile.budgetRange.max < 3000000) {
+      if ((profile as any).budgetRange?.max) {
+        if ((profile as any).budgetRange.max < 3000000) {
           chips.unshift("Giá dưới 2 triệu");
-        } else if (profile.budgetRange.max < 5000000) {
+        } else if ((profile as any).budgetRange.max < 5000000) {
           chips.unshift("Giá dưới 4 triệu");
-        } else if (profile.budgetRange.max < 10000000) {
+        } else if ((profile as any).budgetRange.max < 10000000) {
           chips.unshift("Giá dưới 8 triệu");
         }
       }
       
       // Filter theo quận/phường ưa thích
-      if (profile.preferredDistricts?.length) {
-        profile.preferredDistricts.slice(0, 2).forEach(district => {
+      if ((profile as any).preferredDistricts?.length) {
+        (profile as any).preferredDistricts.slice(0, 2).forEach((district: any) => {
           chips.unshift(`Quận ${district}`);
         });
       }
@@ -119,8 +119,8 @@ export default function SearchDetails({
       }
       
       // Filter theo tiện ích ưa thích
-      if (profile.amenities?.length) {
-        profile.amenities.forEach(amenity => {
+      if ((profile as any).amenities?.length) {
+        (profile as any).amenities.forEach((amenity: any) => {
           if (amenity === 'air_conditioning') chips.push("Có máy lạnh");
           else if (amenity === 'balcony') chips.push("Có ban công");
           else if (amenity === 'parking') chips.push("Có chỗ đỗ xe");
@@ -129,9 +129,9 @@ export default function SearchDetails({
       }
       
       // Filter theo lifestyle
-      if (profile.lifestyle === 'quiet') {
+      if ((profile as any).lifestyle === 'quiet') {
         chips.push("Yên tĩnh");
-      } else if (profile.lifestyle === 'social') {
+      } else if ((profile as any).lifestyle === 'social') {
         chips.push("Năng động");
       }
     }
@@ -139,17 +139,22 @@ export default function SearchDetails({
     return chips;
   }, [profile, user, simplifiedChips]);
 
-  // Load profile khi component mount
+  // Load profile khi component mount (bỏ qua landlord)
   useEffect(() => {
     (async () => {
       try {
-        const userProfile = await getMyProfile();
-        setProfile(userProfile as any);
+        // Chỉ gọi khi user đã sẵn sàng và không phải landlord
+        if (user && (user as any)?.role !== 'landlord') {
+          const userProfile = await getMyProfile();
+          setProfile(userProfile as any);
+        } else {
+          setProfile(null);
+        }
       } catch (error) {
         // Không có profile, dùng filter cơ bản
       }
     })();
-  }, []);
+  }, [user?.role]);
 
   const toggle = (name: string) => {
     setSelected((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));

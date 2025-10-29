@@ -25,11 +25,12 @@ export default function Suggestions() {
     const loadMixedPosts = async () => {
       try {
         setLoading(true);
-        // Load profile (nếu đã đăng nhập)
+        // Load profile (nếu đã đăng nhập và KHÔNG phải landlord)
         let pf: UserProfile | null = null;
         try {
           const token = localStorage.getItem("token");
-          if (token) {
+          // Chỉ gọi khi user đã sẵn sàng và không phải landlord
+          if (token && user && (user as any)?.role !== 'landlord') {
             pf = (await getMyProfile()) as any;
             setProfile(pf);
           }

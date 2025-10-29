@@ -35,10 +35,14 @@ export default function RoomList() {
         setLoading(true);
         setErr("");
 
-        // Load profile nếu có
+        // Load profile nếu có và KHÔNG phải landlord
         try {
-          const pf = await getMyProfile();
-          setProfile(pf as any);
+          if (user && (user as any)?.role !== 'landlord') {
+            const pf = await getMyProfile();
+            setProfile(pf as any);
+          } else {
+            setProfile(null);
+          }
         } catch {}
 
         // Gọi unified search API để lấy tất cả posts
