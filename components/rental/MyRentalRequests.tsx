@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { getUserRentalRequests, formatRentalStatus } from "@/services/rentalRequests";
+import { getRoomById } from "@/services/rooms";
+import { addressService } from "@/services/address";
 import { RentalRequest } from "@/services/rentalRequests";
 import { useToast } from "@/contexts/ToastContext";
 import { ToastMessages } from "@/utils/toastMessages";
@@ -29,7 +31,37 @@ export default function MyRentalRequests() {
           request.status === 'cancelled'
         )
       );
-      setRequests(rentalRequests);
+      // Bổ sung thông tin phòng/tòa/địa chỉ nếu thiếu
+      const needsAugment = rentalRequests.some(r => !r.roomNumber || !r.buildingName || !r.address);
+      if (needsAugment) {
+        const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+        const uniqueRoomIds = Array.from(new Set(rentalRequests.map(r => r.roomId).filter(Boolean)));
+        await Promise.all(uniqueRoomIds.map(async (roomId) => {
+          try {
+            const room = await getRoomById(Number(roomId));
+            const formattedAddress = room?.address
+              ? addressService.formatAddressForDisplay(room.address as any)
+              : undefined;
+            roomIdToInfo[Number(roomId)] = {
+              roomNumber: room?.roomNumber,
+              buildingName: room?.building?.name,
+              address: formattedAddress,
+              category: (room as any)?.category
+            };
+          } catch {}
+        }));
+
+        const augmented = rentalRequests.map(r => ({
+          ...r,
+          roomNumber: r.roomNumber || roomIdToInfo[r.roomId]?.roomNumber,
+          buildingName: r.buildingName || roomIdToInfo[r.roomId]?.buildingName,
+          address: r.address || roomIdToInfo[r.roomId]?.address,
+          roomCategory: roomIdToInfo[r.roomId]?.category,
+        }));
+        setRequests(augmented);
+      } else {
+        setRequests(rentalRequests);
+      }
     } catch (error: any) {
       const message = ToastMessages.error.load('Danh sách đăng ký thuê');
       showError(message.title, error.message || message.message);
@@ -54,6 +86,19 @@ export default function MyRentalRequests() {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
+  const formatRoomCategory = (category?: string) => {
+    if (!category) return undefined;
+    const map: Record<string, string> = {
+      'phong-tro': 'Phòng trọ',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+    };
+    return map[category] || category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -93,10 +138,20 @@ export default function MyRentalRequests() {
           <div key={request.requestId} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
                   {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng ${request.postId}`}
                 </h3>
+                {(request.buildingName || request.address) && (
+                  <p className="text-sm text-gray-600 mb-2">
+                    {request.buildingName && <span className="font-medium">{request.buildingName}</span>}
+                    {request.buildingName && request.address && <span> • </span>}
+                    {request.address}
+                  </p>
+                )}
                 <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <span>
+                    <strong>Loại phòng:</strong> {formatRoomCategory((request as any).roomCategory)}
+                  </span>
                   <span>
                     <strong>Ngày chuyển vào:</strong> {formatDate(request.requestedMoveInDate)}
                   </span>

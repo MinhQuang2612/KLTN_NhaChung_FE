@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { getMySharingRequests, RoomSharingRequest } from '@/services/roomSharing';
+import { getRoomById } from '@/services/rooms';
+import { addressService } from '@/services/address';
 import { useToast } from '@/contexts/ToastContext';
 import { ToastMessages } from '@/utils/toastMessages';
 import Link from 'next/link';
@@ -17,7 +19,36 @@ const MySharingRequests: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await getMySharingRequests();
-      setRequests(data || []);
+      const requestsList = data || [];
+      
+      // Bổ sung thông tin phòng/tòa/địa chỉ/loại phòng nếu thiếu
+      const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+      const uniqueRoomIds = Array.from(new Set(requestsList.map(r => r.roomId).filter(Boolean)));
+      
+      await Promise.all(uniqueRoomIds.map(async (roomId) => {
+        try {
+          const room = await getRoomById(Number(roomId));
+          const formattedAddress = room?.address
+            ? addressService.formatAddressForDisplay(room.address as any)
+            : undefined;
+          roomIdToInfo[Number(roomId)] = {
+            roomNumber: room?.roomNumber,
+            buildingName: room?.building?.name,
+            address: formattedAddress,
+            category: (room as any)?.category
+          };
+        } catch {}
+      }));
+
+      const augmented = requestsList.map(r => ({
+        ...r,
+        roomNumber: roomIdToInfo[r.roomId]?.roomNumber,
+        buildingName: roomIdToInfo[r.roomId]?.buildingName,
+        address: roomIdToInfo[r.roomId]?.address,
+        roomCategory: roomIdToInfo[r.roomId]?.category,
+      }));
+      
+      setRequests(augmented);
     } catch (err: any) {
       setError('Không thể tải danh sách yêu cầu ở ghép. Vui lòng thử lại sau.');
       const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
@@ -59,6 +90,19 @@ const MySharingRequests: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const formatRoomCategory = (category?: string) => {
+    if (!category) return undefined;
+    const map: Record<string, string> = {
+      'phong-tro': 'Phòng trọ',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+    };
+    return map[category] || category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   };
 
   if (loading) {
@@ -108,38 +152,47 @@ const MySharingRequests: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {requests.map((request) => (
-            <div key={request.requestId} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <h4 className="font-medium text-gray-900">Yêu cầu #{request.requestId}</h4>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                    {getStatusText(request.status)}
-                  </span>
+          {requests.map((request: any) => (
+            <div key={request.requestId} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
+                    </h3>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                      {getStatusText(request.status)}
+                    </span>
+                  </div>
+                  
+                  {(request.buildingName || request.address) && (
+                    <p className="text-sm text-gray-600 mb-2">
+                      {request.buildingName && <span className="font-medium">{request.buildingName}</span>}
+                      {request.buildingName && request.address && <span> • </span>}
+                      {request.address}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div>
+                      <strong>Loại phòng:</strong> {formatRoomCategory(request.roomCategory) || 'N/A'}
+                    </div>
+                    <div>
+                      <strong>Ngày dọn vào:</strong> {formatDate(request.requestedMoveInDate)}
+                    </div>
+                    <div>
+                      <strong>Thời hạn:</strong> {request.requestedDuration} tháng
+                    </div>
+                  </div>
                 </div>
                 {request.status === 'approved' && request.contractId && (
                   <Link
                     href={`/contracts/${request.contractId}`}
-                    className="px-3 py-1 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition-colors"
+                    className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition-colors ml-4"
                   >
                     Xem hợp đồng
                   </Link>
                 )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Phòng:</span>
-                  <span className="ml-1 font-medium">#{request.roomId}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Ngày dọn vào:</span>
-                  <span className="ml-1 font-medium">{formatDate(request.requestedMoveInDate)}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Thời hạn:</span>
-                  <span className="ml-1 font-medium">{request.requestedDuration} tháng</span>
-                </div>
               </div>
 
               {request.message && (

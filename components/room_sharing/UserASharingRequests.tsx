@@ -8,6 +8,8 @@ import {
   rejectSharingRequestByUser,
   RoomSharingRequest 
 } from '@/services/roomSharing';
+import { getRoomById } from '@/services/rooms';
+import { addressService } from '@/services/address';
 import { getUserRentalRequests } from '@/services/rentalRequests';
 import { getLandlordRentalRequests } from '@/services/landlord';
 import { useToast } from '@/contexts/ToastContext';
@@ -34,7 +36,32 @@ const UserASharingRequests: React.FC = () => {
       
       // Kết hợp cả 2 danh sách
       const allRequests = [...(pendingRequests || []), ...(historyRequests || [])];
-      setRequests(allRequests);
+
+      // Augment thông tin phòng nếu có thể
+      const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+      const uniqueRoomIds = Array.from(new Set(allRequests.map(r => r.roomId).filter(Boolean)));
+      await Promise.all(uniqueRoomIds.map(async (roomId) => {
+        try {
+          const room = await getRoomById(Number(roomId));
+          const formattedAddress = room?.address ? addressService.formatAddressForDisplay(room.address as any) : undefined;
+          roomIdToInfo[Number(roomId)] = {
+            roomNumber: (room as any)?.roomNumber,
+            buildingName: (room as any)?.building?.name,
+            address: formattedAddress,
+            category: (room as any)?.category
+          };
+        } catch {}
+      }));
+
+      const augmented = allRequests.map(r => ({
+        ...r,
+        roomNumber: roomIdToInfo[r.roomId]?.roomNumber,
+        buildingName: roomIdToInfo[r.roomId]?.buildingName,
+        address: roomIdToInfo[r.roomId]?.address,
+        roomCategory: roomIdToInfo[r.roomId]?.category,
+      })) as any;
+
+      setRequests(augmented);
     } catch (err: any) {
       setError('Không thể tải danh sách yêu cầu ở ghép. Vui lòng thử lại sau.');
       const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
@@ -94,6 +121,19 @@ const UserASharingRequests: React.FC = () => {
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatRoomCategory = (category?: string) => {
+    if (!category) return undefined;
+    const map: Record<string, string> = {
+      'phong-tro': 'Phòng trọ',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+    };
+    return map[category] || category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   };
 
   if (loading) {
@@ -156,8 +196,16 @@ const UserASharingRequests: React.FC = () => {
             <div key={request.requestId} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Yêu cầu #{request.requestId}</h3>
-                  <p className="text-sm text-gray-600">Phòng ID: {request.roomId}</p>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
+                  </h3>
+                  {(request as any).buildingName || (request as any).address ? (
+                    <p className="text-sm text-gray-600 mt-1">
+                      {(request as any).buildingName && <span className="font-medium">{(request as any).buildingName}</span>}
+                      {(request as any).buildingName && (request as any).address && <span> • </span>}
+                      {(request as any).address}
+                    </p>
+                  ) : null}
                 </div>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
                   {getStatusText(request.status)}
@@ -170,6 +218,10 @@ const UserASharingRequests: React.FC = () => {
                   <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{request.message}</p>
                 </div>
                 <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Loại phòng:</p>
+                    <p className="font-medium">{formatRoomCategory((request as any).roomCategory) || 'N/A'}</p>
+                  </div>
                   <div>
                     <p className="text-sm text-gray-600">Ngày dọn vào:</p>
                     <p className="font-medium">{new Date(request.requestedMoveInDate).toLocaleDateString('vi-VN')}</p>
@@ -184,6 +236,18 @@ const UserASharingRequests: React.FC = () => {
               <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                 <p className="text-sm text-gray-500">
                   Tạo lúc: {new Date(request.createdAt).toLocaleString('vi-VN')}
+                  {request.status === 'pending_user_approval' && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-yellow-700">Đang chờ bạn xác nhận</span>
+                    </>
+                  )}
+                  {request.status === 'pending_landlord_approval' && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-blue-700">Đã chuyển cho chủ nhà duyệt</span>
+                    </>
+                  )}
                 </p>
                 
                 {request.status === 'pending_user_approval' && (

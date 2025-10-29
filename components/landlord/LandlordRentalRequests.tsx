@@ -18,6 +18,9 @@ import {
 import { useToast } from "@/contexts/ToastContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ToastMessages } from "@/utils/toastMessages";
+import { getRoomById } from "@/services/rooms";
+import { addressService } from "@/services/address";
+import { getUserById } from "@/services/user";
 
 export default function LandlordRentalRequests() {
   const [activeTab, setActiveTab] = useState<'rental' | 'sharing'>('rental');
@@ -94,8 +97,41 @@ export default function LandlordRentalRequests() {
         console.log('🔍 [DEBUG] Sharing data length:', sharingData.length);
         
         if (sharingData.length > 0) {
-          // Nếu API riêng có data, dùng nó
-          setSharingRequests(sharingData);
+          // Nếu API riêng có data, augment thêm thông tin phòng
+          const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+          const tenantIdToInfo: Record<number, { name?: string; phone?: string }> = {};
+          const uniqueRoomIds = Array.from(new Set(sharingData.map(r => r.roomId).filter(Boolean)));
+          const uniqueTenantIds = Array.from(new Set(sharingData.map(r => r.tenantId).filter(Boolean)));
+          await Promise.all(uniqueRoomIds.map(async (roomId) => {
+            try {
+              const room = await getRoomById(Number(roomId));
+              const formattedAddress = room?.address ? addressService.formatAddressForDisplay(room.address as any) : undefined;
+              roomIdToInfo[Number(roomId)] = {
+                roomNumber: (room as any)?.roomNumber,
+                buildingName: (room as any)?.building?.name,
+                address: formattedAddress,
+                category: (room as any)?.category
+              };
+            } catch {}
+          }));
+          await Promise.all(uniqueTenantIds.map(async (tenantId) => {
+            try {
+              const user = await getUserById(tenantId);
+              tenantIdToInfo[Number(tenantId)] = { name: (user as any)?.name, phone: (user as any)?.phone };
+            } catch {}
+          }));
+
+          const augmented = sharingData.map(r => ({
+            ...r,
+            roomNumber: roomIdToInfo[r.roomId]?.roomNumber,
+            buildingName: roomIdToInfo[r.roomId]?.buildingName,
+            address: roomIdToInfo[r.roomId]?.address,
+            roomCategory: roomIdToInfo[r.roomId]?.category,
+            senderName: tenantIdToInfo[r.tenantId]?.name,
+            senderPhone: tenantIdToInfo[r.tenantId]?.phone,
+          })) as any;
+
+          setSharingRequests(augmented);
           return;
         }
       } catch (error) {
@@ -115,13 +151,47 @@ export default function LandlordRentalRequests() {
       console.log('🔍 [DEBUG] Sharing requests length:', sharingRequests.length);
       
       // Convert LandlordRentalRequest to RoomSharingRequest format
-      const convertedSharingRequests = sharingRequests.map(request => ({
+      const convertedSharingRequestsRaw = sharingRequests.map(request => ({
         ...request,
         posterId: request.tenantId,
         requestType: 'room_sharing' as const,
         status: request.status as any // Cast để tạm thời giải quyết type mismatch
       }));
-      
+
+      // Augment thêm thông tin phòng cho fallback
+      const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+      const tenantIdToInfo: Record<number, { name?: string; phone?: string }> = {};
+      const uniqueRoomIds = Array.from(new Set(convertedSharingRequestsRaw.map((r: any) => r.roomId).filter(Boolean)));
+      const uniqueTenantIds = Array.from(new Set(convertedSharingRequestsRaw.map((r: any) => r.tenantId).filter(Boolean)));
+      await Promise.all(uniqueRoomIds.map(async (roomId) => {
+        try {
+          const room = await getRoomById(Number(roomId));
+          const formattedAddress = room?.address ? addressService.formatAddressForDisplay(room.address as any) : undefined;
+          roomIdToInfo[Number(roomId)] = {
+            roomNumber: (room as any)?.roomNumber,
+            buildingName: (room as any)?.building?.name,
+            address: formattedAddress,
+            category: (room as any)?.category
+          };
+        } catch {}
+      }));
+      await Promise.all(uniqueTenantIds.map(async (tenantId) => {
+        try {
+          const user = await getUserById(tenantId);
+          tenantIdToInfo[Number(tenantId)] = { name: (user as any)?.name, phone: (user as any)?.phone };
+        } catch {}
+      }));
+
+      const convertedSharingRequests = (convertedSharingRequestsRaw as any).map((r: any) => ({
+        ...r,
+        roomNumber: roomIdToInfo[r.roomId]?.roomNumber,
+        buildingName: roomIdToInfo[r.roomId]?.buildingName,
+        address: roomIdToInfo[r.roomId]?.address,
+        roomCategory: roomIdToInfo[r.roomId]?.category,
+        senderName: tenantIdToInfo[r.tenantId]?.name,
+        senderPhone: tenantIdToInfo[r.tenantId]?.phone,
+      }));
+
       setSharingRequests(convertedSharingRequests as any);
     } catch (error: any) {
       const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
@@ -429,7 +499,7 @@ export default function LandlordRentalRequests() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Yêu cầu #{request.requestId}
+                      Yêu cầu thuê
                     </h3>
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getRentalRequestStatusColor(request.status)}`}>
                       {formatRentalRequestStatus(request.status)}
@@ -438,9 +508,10 @@ export default function LandlordRentalRequests() {
                   
                   <div className="grid md:grid-cols-3 gap-4 text-sm text-gray-600">
                     <div>
-                      <p><strong>Phòng:</strong> {request.roomInfo?.roomType ? 
-                        formatRoomType(request.roomInfo.roomType) : 
-                        `Phòng ${request.roomId}`}</p>
+                      <p><strong>Phòng:</strong> {request.roomInfo?.roomNumber || request.roomId}</p>
+                      {request.roomInfo?.roomType && (
+                        <p><strong>Loại phòng:</strong> {formatRoomType(request.roomInfo.roomType)}</p>
+                      )}
                       <p><strong>Người thuê:</strong> {request.tenantInfo?.fullName || `User ${request.tenantId}`}</p>
                     </div>
                     <div>
@@ -449,6 +520,9 @@ export default function LandlordRentalRequests() {
                     </div>
                     <div>
                       <p><strong>Ngày gửi:</strong> {formatDate(request.createdAt)}</p>
+                      {(request.roomInfo?.buildingName || request.roomInfo?.address) && (
+                        <p><strong>Địa chỉ:</strong> {(request.roomInfo?.buildingName ? `${request.roomInfo.buildingName} • ` : '') + (request.roomInfo?.address || '')}</p>
+                      )}
                       {request.respondedAt && (
                         <p><strong>Ngày phản hồi:</strong> {formatDate(request.respondedAt)}</p>
                       )}
@@ -496,7 +570,7 @@ export default function LandlordRentalRequests() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        Yêu cầu ở ghép #{request.requestId}
+                        Yêu cầu ở ghép
                       </h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSharingStatusColor(request.status)}`}>
                         {getSharingStatusText(request.status)}
@@ -504,19 +578,25 @@ export default function LandlordRentalRequests() {
                     </div>
                     
                     <div className="grid md:grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div>
+                      <p><strong>Phòng:</strong> {(request as any).roomNumber || request.roomId}</p>
+                      {(request as any).roomCategory && (
+                        <p><strong>Loại phòng:</strong> {formatRoomType((request as any).roomCategory)}</p>
+                      )}
+                      {(request as any).senderName && (
+                        <p><strong>Người gửi:</strong> {(request as any).senderName}</p>
+                      )}
+                    </div>
                       <div>
-                        <p><strong>Phòng:</strong> {request.roomId}</p>
-                        <p><strong>Người ở ghép:</strong> {request.tenantId}</p>
-                      </div>
-                      <div>
-                        <p><strong>Ngày dọn vào:</strong> {formatDate(request.requestedMoveInDate)}</p>
+                      <p><strong>Ngày dọn vào:</strong> {formatDate(request.requestedMoveInDate)}</p>
                         <p><strong>Thời hạn:</strong> {request.requestedDuration} tháng</p>
                       </div>
                       <div>
                         <p><strong>Ngày gửi:</strong> {formatDate(request.createdAt)}</p>
-                        {request.contractId && (
-                          <p><strong>Hợp đồng:</strong> #{request.contractId}</p>
-                        )}
+                      {((request as any).buildingName || (request as any).address) && (
+                        <p><strong>Địa chỉ:</strong> {((request as any).buildingName ? `${(request as any).buildingName} • ` : '') + ((request as any).address || '')}</p>
+                      )}
+                      {/* Ẩn hiển thị Hợp đồng theo yêu cầu */}
                       </div>
                     </div>
 
