@@ -118,7 +118,7 @@ export async function getContractPaymentStatus(contractId: number): Promise<Room
  * Tạo mã QR thanh toán ZaloPay
  */
 export async function generateZaloPayQR(invoiceId: number): Promise<ZaloPayQRData> {
-  return apiPost("payments/generate-qr", { invoiceId });
+  return apiPost("payments/generate-zalopay-qr", { invoiceId });
 }
 
 /**

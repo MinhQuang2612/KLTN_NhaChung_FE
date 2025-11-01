@@ -1,4 +1,4 @@
-import { apiPost } from "@/utils/api";
+import { apiGet, apiPost } from "@/utils/api";
 
 export interface ManualInvoiceOtherItem {
   description: string;
@@ -45,6 +45,27 @@ export interface CreateManualInvoiceResponse {
 
 export async function createManualInvoice(payload: CreateManualInvoicePayload): Promise<CreateManualInvoiceResponse> {
   return apiPost("landlord/invoices/manual", payload);
+}
+
+export interface MaintenanceFeeInvoice {
+  invoiceId: number;
+  landlordId: number;
+  invoiceType: 'maintenance_fee';
+  amount: number;
+  dueDate: string;
+  status: 'pending' | 'paid';
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  paymentMethod?: string;
+  paidDate?: string;
+}
+
+/**
+ * Lấy danh sách hóa đơn phí duy trì
+ */
+export async function getMaintenanceFeeInvoices(): Promise<MaintenanceFeeInvoice[]> {
+  return apiGet("landlord/invoices?invoiceType=maintenance_fee");
 }
 
 
