@@ -6,6 +6,30 @@ import { useFavorites } from "../../contexts/FavoritesContext";
 import { formatPrice } from "@/utils/format";
 import { addressService } from "../../services/address";
 
+type PostCardProps = RoomCardData & {
+  highlight?: {
+    title?: string;
+    address?: string;
+    description?: string;
+  };
+};
+
+function sanitizeEmOnly(html: string): string {
+  if (!html) return "";
+  // Bảo toàn <em> rồi loại bỏ mọi thẻ khác và thuộc tính
+  const placeholderOpen = "__EM_OPEN__";
+  const placeholderClose = "__EM_CLOSE__";
+  let out = html
+    .replace(/<\s*em\s*>/gi, placeholderOpen)
+    .replace(/<\s*\/\s*em\s*>/gi, placeholderClose);
+  // Loại bỏ toàn bộ thẻ còn lại
+  out = out.replace(/<[^>]+>/g, "");
+  // Khôi phục thẻ em chuẩn
+  out = out.replace(new RegExp(placeholderOpen, 'g'), '<em>')
+           .replace(new RegExp(placeholderClose, 'g'), '</em>');
+  return out;
+}
+
 export default function PostCard({
   rentPostId,
   category,
@@ -19,8 +43,8 @@ export default function PostCard({
   city,
   price,
   isVerified,
-  distanceKm,
-}: RoomCardData) {
+  highlight,
+}: PostCardProps) {
   const router = useRouter();
   const { isFavorited, toggleFavorite } = useFavorites();
   
@@ -128,7 +152,13 @@ export default function PostCard({
       {/* Nội dung */}
       <div className="p-4 group-hover:bg-gradient-to-br group-hover:from-gray-50 group-hover:to-white transition-all duration-300">
         <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-teal-700 transition-colors duration-300">
-          {title}
+          {highlight?.title ? (
+            <span
+              dangerouslySetInnerHTML={{ __html: sanitizeEmOnly(highlight.title) }}
+            />
+          ) : (
+            title
+          )}
         </h3>
 
         {/* Diện tích - PN - WC */}
@@ -158,7 +188,14 @@ export default function PostCard({
               clipRule="evenodd"
             />
           </svg>
-          {address ? addressService.formatWardCity(address) : (city || "")}
+          {highlight?.address ? (
+            <span
+              className="line-clamp-1"
+              dangerouslySetInnerHTML={{ __html: sanitizeEmOnly(highlight.address) }}
+            />
+          ) : (
+            address ? addressService.formatWardCity(address) : (city || "")
+          )}
         </div>
 
         {/* Giá */}

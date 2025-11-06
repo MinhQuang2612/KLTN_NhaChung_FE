@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getMyProfile, UserProfile } from "@/services/userProfiles";
+import { parseIntent } from "@/utils/searchIntent";
 
 // Filter cơ bản (luôn hiển thị)
 const BASE_CHIPS = [
@@ -39,19 +40,20 @@ export default function SearchDetails({
   simplifiedChips = false,
   hideTitles = false,
   hideWrapper = false,
+  redirectToFindShare = false,
 }: {
   hideChips?: boolean;
   hideRecentSearches?: boolean;
   simplifiedChips?: boolean;
   hideTitles?: boolean;
   hideWrapper?: boolean;
+  redirectToFindShare?: boolean;
 } = {}) {
   const { user } = useAuth();
   const [q, setQ] = useState("");
-  const debounceMs = 400;
-  const timerRef = useRef<any>(null);
   const isFirstLoadRef = useRef(true);
   const [selected, setSelected] = useState<string[]>([]); // Tắt filter sẵn
+  const [mounted, setMounted] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeFilters, setActiveFilters] = useState({
@@ -156,6 +158,21 @@ export default function SearchDetails({
     })();
   }, [user?.role]);
 
+  // Load recent searches từ localStorage sau khi mount (chỉ trên client)
+  useEffect(() => {
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('recentSearches');
+        if (saved) {
+          setRecentSearches(JSON.parse(saved));
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  }, []);
+
   const toggle = (name: string) => {
     setSelected((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));
   };
@@ -165,12 +182,34 @@ export default function SearchDetails({
     const url = new URL(window.location.href);
     if (value.trim()) url.searchParams.set('q', value.trim());
     else url.searchParams.delete('q');
+    
+    // Suy luận ý định "ở ghép" và giới tính từ câu truy vấn tự nhiên
+    const { isRoommate, gender } = parseIntent(value);
+    
+    if (isRoommate) {
+      url.searchParams.set('roommate', 'true');
+      if (gender) url.searchParams.set('searcherGender', gender);
+      else url.searchParams.delete('searcherGender');
+    } else {
+      url.searchParams.delete('roommate');
+      url.searchParams.delete('searcherGender');
+    }
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   };
 
   const emitSearchEvent = (value: string) => {
     if (typeof window === 'undefined') return;
-    window.dispatchEvent(new CustomEvent('app:nlp-search', { detail: { q: value.trim() } }));
+    const trimmed = value.trim();
+    window.dispatchEvent(new CustomEvent('app:nlp-search', { detail: { q: trimmed } }));
+    // Nếu sử dụng ở trang không có PropertyList (ví dụ trang chủ), điều hướng sang /find_share
+    try {
+      const curPath = window.location.pathname;
+      if (redirectToFindShare && curPath !== '/find_share') {
+        const url = new URL(window.location.origin + '/find_share');
+        if (trimmed) url.searchParams.set('q', trimmed);
+        window.location.href = url.toString();
+      }
+    } catch {}
   };
 
   const handleSearch = () => {
@@ -178,7 +217,14 @@ export default function SearchDetails({
     if (q.trim()) {
       setRecentSearches(prev => {
         const newSearches = [q.trim(), ...prev.filter(item => item !== q.trim())];
-        return newSearches.slice(0, 5);
+        const limited = newSearches.slice(0, 5);
+        // Lưu vào localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('recentSearches', JSON.stringify(limited));
+          } catch {}
+        }
+        return limited;
       });
     }
     
@@ -186,7 +232,14 @@ export default function SearchDetails({
     if (selected.length > 0) {
       setRecentSearches(prev => {
         const newSearches = [...selected, ...prev.filter(item => !selected.includes(item))];
-        return newSearches.slice(0, 5);
+        const limited = newSearches.slice(0, 5);
+        // Lưu vào localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('recentSearches', JSON.stringify(limited));
+          } catch {}
+        }
+        return limited;
       });
     }
     
@@ -194,31 +247,25 @@ export default function SearchDetails({
     emitSearchEvent(q);
   };
 
-  // Load q từ URL khi vào trang hoặc khi back/forward
+  // Clear query từ URL khi reload (user reload = không muốn search nữa)
+  // Input luôn trống khi mount để load suggestions
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    const initialQ = url.searchParams.get('q') || "";
-    setQ(initialQ);
-  }, []);
-
-  // Debounce khi gõ
-  useEffect(() => {
-    if (isFirstLoadRef.current) {
-      isFirstLoadRef.current = false;
-      if (q) {
-        pushQueryToUrl(q);
-        emitSearchEvent(q);
-      }
-      return;
+    const urlQ = url.searchParams.get('q');
+    
+    // Clear query params khi có query trong URL (coi như reload)
+    // Để input trống và PropertyList sẽ load suggestions
+    if (urlQ) {
+      url.searchParams.delete('q');
+      url.searchParams.delete('roommate');
+      url.searchParams.delete('searcherGender');
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     }
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      pushQueryToUrl(q);
-      if (q.trim()) emitSearchEvent(q);
-    }, debounceMs);
-    return () => timerRef.current && clearTimeout(timerRef.current);
-  }, [q]);
+    
+    // Input luôn trống khi mount
+    setQ("");
+  }, []);
 
   const clearFilters = () => {
     setSelected([]); // Xóa chips được chọn
@@ -236,6 +283,9 @@ export default function SearchDetails({
 
   const handleRecentClick = (searchTerm: string) => {
     setQ(searchTerm);
+    // Trigger search ngay khi click vào recent search
+    pushQueryToUrl(searchTerm);
+    emitSearchEvent(searchTerm);
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
@@ -415,7 +465,7 @@ export default function SearchDetails({
           {/* Recent searches and clear filters */}
           {!hideRecentSearches && (
             <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
-              {recentSearches.length > 0 ? (
+              {mounted && recentSearches.length > 0 ? (
                 <>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />

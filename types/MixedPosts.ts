@@ -27,6 +27,11 @@ export interface UnifiedPost {
 
 // Helper functions để convert
 export function rentPostToUnified(post: RentPostApi): UnifiedPost {
+  // Chỉ lấy bedrooms/bathrooms cho chung cư và nhà nguyên căn, không lấy cho phòng trọ
+  const isPhongTro = post.category === 'phong-tro';
+  const bedrooms = isPhongTro ? undefined : post.basicInfo.bedrooms;
+  const bathrooms = isPhongTro ? undefined : post.basicInfo.bathrooms;
+  
   return {
     id: post.rentPostId,
     type: 'rent',
@@ -39,8 +44,8 @@ export function rentPostToUnified(post: RentPostApi): UnifiedPost {
     address: post.address,
     category: post.category,
     photoCount: (post.images?.length || 0) + (post.videos?.length || 0),
-    bedrooms: post.basicInfo.bedrooms,
-    bathrooms: post.basicInfo.bathrooms,
+    bedrooms,
+    bathrooms,
     isVerified: post.isVerified,
     createdAt: post.createdAt,
     originalData: post
@@ -77,8 +82,18 @@ export function searchPostToUnified(post: any, roomData?: any): UnifiedPost {
   const area = roomData?.area ?? post.roomInfo?.basicInfo?.area ?? 0;
   const address = roomData?.address ?? post.roomInfo?.address;
   const location = address ? addressService.formatWardCity(address) : 'Chưa xác định';
-  const bedrooms = roomData?.chungCuInfo?.bedrooms || roomData?.nhaNguyenCanInfo?.bedrooms || post.roomInfo?.basicInfo?.bedrooms;
-  const bathrooms = roomData?.chungCuInfo?.bathrooms || roomData?.nhaNguyenCanInfo?.bathrooms || post.roomInfo?.basicInfo?.bathrooms;
+  
+  // Chỉ lấy bedrooms/bathrooms cho chung cư và nhà nguyên căn, không lấy cho phòng trọ
+  const roomType = roomData?.roomType || post.category || '';
+  const category = post.category || mappedPostType;
+  const isPhongTro = roomType === 'phong-tro' || category === 'phong-tro';
+  
+  let bedrooms: number | undefined = undefined;
+  let bathrooms: number | undefined = undefined;
+  if (!isPhongTro) {
+    bedrooms = roomData?.chungCuInfo?.bedrooms || roomData?.nhaNguyenCanInfo?.bedrooms || post.roomInfo?.basicInfo?.bedrooms;
+    bathrooms = roomData?.chungCuInfo?.bathrooms || roomData?.nhaNguyenCanInfo?.bathrooms || post.roomInfo?.basicInfo?.bathrooms;
+  }
 
   return {
     id: post.postId,
@@ -90,7 +105,7 @@ export function searchPostToUnified(post: any, roomData?: any): UnifiedPost {
     area,
     location,
     address,
-    category: mappedPostType,
+    category: category,
     photoCount: images.length + (post.videos?.length || 0),
     bedrooms,
     bathrooms,

@@ -1,10 +1,8 @@
-import { apiGet } from "@/utils/api";
+// API base
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export type NlpSearchParams = {
   q: string;
-  radiusKm?: number;
-  limit?: number;
-  page?: number;
 };
 
 export type NlpSearchItem = {
@@ -15,47 +13,39 @@ export type NlpSearchItem = {
   images?: string[];
   price?: number;
   area?: number;
-  address?: any;
-  distance?: number; // meters
-  score?: number; // relevance score
+  address?: { full?: string; [k: string]: any } | any;
+  distance?: number;
+  highlight?: Record<string, string[]>;
   createdAt?: string;
   [key: string]: any;
 };
 
-export type NlpSearchResponse = {
-  posts: NlpSearchItem[];
-  total?: number;
-  page?: number;
-  limit?: number;
+export type NlpSearchData = {
+  items: NlpSearchItem[];
+  page: number;
+  limit: number;
+  total: number;
 };
 
-export async function nlpSearch(params: NlpSearchParams, timeoutMs: number = 8000): Promise<NlpSearchResponse> {
-  const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
-  const t = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
-  try {
-    const searchParams = new URLSearchParams();
-    if (!params.q || !params.q.trim()) {
-      throw Object.assign(new Error("Thiếu truy vấn tìm kiếm"), { status: 400 });
-    }
-    searchParams.append("q", params.q.trim());
-    if (params.radiusKm != null) searchParams.append("radiusKm", String(params.radiusKm));
-    if (params.limit != null) searchParams.append("limit", String(params.limit));
-    if (params.page != null) searchParams.append("page", String(params.page));
-
-    const query = searchParams.toString();
-    // apiGet không hỗ trợ signal, dùng fetch trực tiếp để timeout, nhưng vẫn cần base URL và headers từ api.ts
-    // Ở đây tạm dùng apiGet, chấp nhận không cancel nếu môi trường không hỗ trợ signal
-    const res = await apiGet<NlpSearchResponse>(`search/nlp${query ? `?${query}` : ""}`);
-    // Chuẩn hóa cấu trúc trả về tối thiểu
-    return Array.isArray((res as any)) ? { posts: res as any } : (res || { posts: [] });
-  } catch (err: any) {
-    if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
-      throw Object.assign(new Error("Yêu cầu quá thời gian"), { status: 408 });
-    }
-    throw err;
-  } finally {
-    if (t) clearTimeout(t as any);
+export async function searchNLP(q: string, opts?: { signal?: AbortSignal }): Promise<NlpSearchData> {
+  if (!q || !q.trim()) {
+    throw Object.assign(new Error("Thiếu truy vấn tìm kiếm"), { status: 400 });
   }
+  const url = new URL("/api/search/nlp", API_BASE);
+  url.searchParams.set("q", q.trim());
+  const res = await fetch(url.toString(), { signal: opts?.signal });
+  if (!res.ok) throw Object.assign(new Error("NLP search failed"), { status: res.status });
+  const json = await res.json();
+  return json.data as NlpSearchData;
 }
 
+export async function searchPosts(params: Record<string, string>, opts?: { signal?: AbortSignal }) {
+  const url = new URL("/api/search/posts", API_BASE);
+  Object.entries(params).forEach(([k, v]) => v && url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), { signal: opts?.signal });
+  if (!res.ok) throw Object.assign(new Error("Search failed"), { status: res.status });
+  return res.json();
+}
 
+// Giữ hàm cũ để tương thích tạm thời với các nơi đang gọi nlpSearch({ q })
+// (Đã chuẩn hóa dùng searchNLP trực tiếp; hàm tương thích cũ đã được loại bỏ)

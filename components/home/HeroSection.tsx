@@ -32,7 +32,7 @@ export default function HeroSection() {
 
         {/* Search card - sử dụng SearchDetails component */}
         <div className="w-full max-w-4xl mx-auto mb-12">
-          <SearchDetails hideWrapper={true} hideTitles={true} hideRecentSearches={true} simplifiedChips={true} />
+          <SearchDetails hideWrapper={true} hideTitles={true} hideRecentSearches={true} simplifiedChips={true} redirectToFindShare={true} />
         </div>
       </div>
     </section>
