@@ -79,7 +79,7 @@ export default function PostPage() {
         <NewPostFlow
           onClose={() => setShowNewPostFlow(false)}
           onSuccess={() => {
-            setShowNewPostFlow(false);
+            // Không đóng form ở đây, để NotificationModal tự đóng form
             // Optionally show success message or redirect
           }}
         />

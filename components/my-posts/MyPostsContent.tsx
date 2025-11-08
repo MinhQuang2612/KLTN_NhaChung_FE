@@ -86,7 +86,6 @@ const normalizePost = async (post: Post): Promise<LegacyPost> => {
 
 export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActivate, onRefresh }: MyPostsContentProps) {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "pending" | "inactive">("all");
-  const [postTypeFilter, setPostTypeFilter] = useState<"all" | "rent" | "roommate">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
@@ -118,22 +117,13 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
   }, [posts]);
 
   const filteredPosts = useMemo(() => {
-    let filtered = normalizedPosts;
-    
-    // Filter by post type first
-    if (postTypeFilter === "rent") {
-      filtered = filtered.filter(post => post.postType === "rent");
-    } else if (postTypeFilter === "roommate") {
-      filtered = filtered.filter(post => post.postType === "roommate");
-    }
-    
-    // Then filter by status
+    // Filter by status only
     if (activeTab === "all") {
-      return filtered;
+      return normalizedPosts;
     } else {
-      return filtered.filter(post => post.status === activeTab);
+      return normalizedPosts.filter(post => post.status === activeTab);
     }
-  }, [normalizedPosts, activeTab, postTypeFilter]);
+  }, [normalizedPosts, activeTab]);
 
   const paginatedPosts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -144,17 +134,8 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
   const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
 
   const getTabCount = (status: string) => {
-    let filtered = normalizedPosts;
-    
-    // Apply post type filter first
-    if (postTypeFilter === "rent") {
-      filtered = filtered.filter(post => post.postType === "rent");
-    } else if (postTypeFilter === "roommate") {
-      filtered = filtered.filter(post => post.postType === "roommate");
-    }
-    
-    if (status === "all") return filtered.length;
-    return filtered.filter(post => post.status === status).length;
+    if (status === "all") return normalizedPosts.length;
+    return normalizedPosts.filter(post => post.status === status).length;
   };
 
   const tabCounts = {
@@ -227,10 +208,6 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
     setCurrentPage(1);
   };
 
-  const handlePostTypeChange = (type: "all" | "rent" | "roommate") => {
-    setPostTypeFilter(type);
-    setCurrentPage(1);
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -339,32 +316,8 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
       {/* Filters Row */}
       <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          {/* Post Type Filter */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700 min-w-0">Lọc theo loại bài đăng</span>
-            <div className="flex gap-2">
-              {[
-                { id: "all", label: "Tất cả" },
-                { id: "rent", label: "Cho thuê" },
-                { id: "roommate", label: "Ở ghép" },
-              ].map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => handlePostTypeChange(type.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    postTypeFilter === type.id
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Status Tabs */}
-          <div className="flex gap-1 ml-auto">
+          <div className="flex gap-1">
             {[
               { id: "all", label: "Tất cả", count: tabCounts.all },
               { id: "active", label: "Đang hiển thị", count: tabCounts.active },
@@ -432,12 +385,6 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
                         </span>
                         <span className="flex items-center gap-1">
                           💰 {formatPrice(post.price)}đ/tháng
-                        </span>
-                        <span className="flex items-center gap-1">
-                          🏷️ {post.postType === 'roommate' ? 'Ở ghép' : 
-                              post.postType === 'rent' ? 'Cho thuê' :
-                              post.category === 'phong-tro' ? 'Phòng trọ' :
-                              post.category === 'chung-cu' ? 'Chung cư' : 'Nhà nguyên căn'}
                         </span>
                       </div>
 
