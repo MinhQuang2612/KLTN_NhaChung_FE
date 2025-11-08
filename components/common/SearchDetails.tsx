@@ -62,6 +62,12 @@ export default function SearchDetails({
     furniture: "Tất cả",
     demand: "Tất cả"
   });
+  const recentSearchKey = useMemo(() => {
+    if (user?.userId) {
+      return `recentSearches_user_${user.userId}`;
+    }
+    return "recentSearches_guest";
+  }, [user?.userId]);
 
   // Sinh filter dựa trên profile user
   const personalizedChips = useMemo(() => {
@@ -163,15 +169,17 @@ export default function SearchDetails({
     setMounted(true);
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('recentSearches');
+        const saved = localStorage.getItem(recentSearchKey);
         if (saved) {
           setRecentSearches(JSON.parse(saved));
+        } else {
+          setRecentSearches([]);
         }
       } catch {
         // Ignore
       }
     }
-  }, []);
+  }, [recentSearchKey]);
 
   const toggle = (name: string) => {
     setSelected((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));
@@ -221,7 +229,7 @@ export default function SearchDetails({
         // Lưu vào localStorage
         if (typeof window !== 'undefined') {
           try {
-            localStorage.setItem('recentSearches', JSON.stringify(limited));
+            localStorage.setItem(recentSearchKey, JSON.stringify(limited));
           } catch {}
         }
         return limited;
@@ -236,7 +244,7 @@ export default function SearchDetails({
         // Lưu vào localStorage
         if (typeof window !== 'undefined') {
           try {
-            localStorage.setItem('recentSearches', JSON.stringify(limited));
+            localStorage.setItem(recentSearchKey, JSON.stringify(limited));
           } catch {}
         }
         return limited;
