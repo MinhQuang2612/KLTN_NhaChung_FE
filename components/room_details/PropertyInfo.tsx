@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { Post } from "../../types/Post";
 import { getRoomById } from "../../services/rooms";
 import { useFavorites } from "../../contexts/FavoritesContext";
+import { getReviewsByTarget } from "../../services/reviews";
+import { FaStar } from "react-icons/fa";
 
 interface PropertyInfoProps {
   postData: Post | null;
@@ -12,6 +14,7 @@ interface PropertyInfoProps {
 export default function PropertyInfo({ postData, postType }: PropertyInfoProps) {
   const [currentImage, setCurrentImage] = useState(0);
   const [roomData, setRoomData] = useState<any>(null);
+  const [rating, setRating] = useState<{ avg: number; count: number } | null>(null);
   const { isFavorited, toggleFavorite } = useFavorites();
   
   // Fetch room data when postData changes
@@ -28,6 +31,32 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
     
     fetchRoomData();
   }, [postData]);
+
+  // Fetch rating for this post
+  useEffect(() => {
+    const fetchRating = async () => {
+      if (postData?.postId) {
+        try {
+          const data = await getReviewsByTarget({
+            targetType: 'POST',
+            targetId: postData.postId,
+            page: 1,
+            pageSize: 1
+          });
+          if (data.ratingSummary && data.ratingSummary.ratingCount > 0) {
+            setRating({
+              avg: data.ratingSummary.ratingAvg,
+              count: data.ratingSummary.ratingCount
+            });
+          }
+        } catch (error) {
+          // Silently fail
+        }
+      }
+    };
+
+    fetchRating();
+  }, [postData?.postId]);
   
   // Extract images từ roomData (preferred) or postData
   const images = (roomData?.images?.length > 0 ? roomData.images : ((postData?.images?.length ?? 0) > 0 ? postData?.images : ["/home/room1.png"]));
@@ -166,7 +195,7 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="text-2xl font-bold text-red-600">
             {roomData?.price 
               ? `${(roomData.price / 1000000).toFixed(1)} triệu / tháng`
@@ -180,6 +209,17 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
             }
           </div>
          </div>
+         {rating && (
+           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg shadow-sm">
+             <FaStar className="w-4 h-4 text-amber-500" />
+             <span className="text-base font-bold text-gray-900">
+               {rating.avg.toFixed(1)}
+             </span>
+             <span className="text-xs text-gray-600">
+               ({rating.count})
+             </span>
+           </div>
+         )}
        </div>
 
       <div className="space-y-3">

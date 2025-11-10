@@ -6,6 +6,8 @@ import VerificationModal from './VerificationModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import { VerificationData } from "../../types/User";
 import { getMyVerificationStatus } from "../../services/verification";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 
 interface AccountSettingsProps {
   isVerified?: boolean;
@@ -13,6 +15,8 @@ interface AccountSettingsProps {
 }
 
 export default function AccountSettings({ isVerified = false, onVerificationComplete }: AccountSettingsProps) {
+  const { refreshUser } = useAuth();
+  const { showSuccess } = useToast();
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<any>(null);
@@ -45,10 +49,13 @@ export default function AccountSettings({ isVerified = false, onVerificationComp
       }
     };
     await loadVerificationStatus();
+    
+    // 🔥 QUAN TRỌNG: Refresh AuthContext để cập nhật user.isVerified
+    await refreshUser();
   };
 
   const handleChangePasswordSuccess = (message: string) => {
-    alert(message);
+    showSuccess('Đổi mật khẩu thành công', message);
   };
 
   return (

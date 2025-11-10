@@ -3,8 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { getPosts } from "../../services/posts";
 import { getUserById } from "../../services/user";
+import { getReviewsByTarget } from "../../services/reviews";
 import { User } from "../../types/User";
 import { useAuth } from "../../contexts/AuthContext";
+import Link from "next/link";
+import { FaStar } from "react-icons/fa";
 
 interface ContactCardProps {
   postData: any;
@@ -15,6 +18,7 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
   const { user } = useAuth();
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [userStats, setUserStats] = useState<{ postsCount: number; joinedDate: string | null }>({ postsCount: 0, joinedDate: null });
+  const [userRating, setUserRating] = useState<{ avg: number; count: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Check if user is viewing their own post or if user is landlord
@@ -49,10 +53,11 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
       }
       
       try {
-        // Fetch user info and user statistics in parallel
-        const [user, userPosts] = await Promise.allSettled([
+        // Fetch user info, user statistics, and rating in parallel
+        const [user, userPosts, userReviews] = await Promise.allSettled([
           getUserById(postData.userId),
-          getPosts({ userId: postData.userId })
+          getPosts({ userId: postData.userId }),
+          getReviewsByTarget({ targetType: 'USER', targetId: postData.userId, page: 1, pageSize: 1 })
         ]);
 
         // Set user info
@@ -86,6 +91,17 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
           postsCount: totalPosts,
           joinedDate: user.status === 'fulfilled' ? (user.value.createdAt || null) : (postData.userCreatedAt || null)
         });
+
+        // Set user rating
+        if (userReviews.status === 'fulfilled' && userReviews.value.ratingSummary) {
+          const summary = userReviews.value.ratingSummary;
+          if (summary.ratingCount > 0) {
+            setUserRating({
+              avg: summary.ratingAvg,
+              count: summary.ratingCount
+            });
+          }
+        }
 
       } catch (error) {
         setUserStats({ postsCount: 0, joinedDate: null });
@@ -132,7 +148,20 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6 relative">
+      {/* User Rating Badge - Góc trên phải */}
+      {userRating && (
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg shadow-sm">
+          <FaStar className="w-4 h-4 text-amber-500" />
+          <span className="font-bold text-gray-900">
+            {userRating.avg.toFixed(1)}
+          </span>
+          <span className="text-xs text-gray-600">
+            ({userRating.count})
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 mb-4">
         <div className="w-16 h-16 rounded-full overflow-hidden">
           <img 
@@ -155,7 +184,15 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
           </div>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{userInfo?.name || "Người dùng"}</h3>
+          <Link 
+            href={`/users/${postData?.userId}`}
+            className="text-lg font-semibold text-gray-900 hover:text-teal-600 transition-colors inline-flex items-center gap-2 group"
+          >
+            {userInfo?.name || "Người dùng"}
+            <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
           <p className="text-sm text-gray-600">
             {postType === 'roommate' ? 'Tìm bạn ở ghép' : 'Là Người cho thuê'}
           </p>

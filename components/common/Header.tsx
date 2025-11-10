@@ -5,6 +5,20 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../../contexts/AuthContext";
 import AreaDropdown from "../home/AreaDropdown";
+import { 
+  FaHome, 
+  FaUser, 
+  FaFileAlt, 
+  FaClipboardCheck, 
+  FaDoorOpen, 
+  FaCreditCard, 
+  FaHeart, 
+  FaSignOutAlt,
+  FaClipboardList,
+  FaBuilding,
+  FaMoneyBillWave,
+  FaChartBar
+} from "react-icons/fa";
 
 export default function Header() {
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
@@ -158,91 +172,137 @@ export default function Header() {
 
             {/* User Dropdown Menu */}
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                  <p className="text-sm text-gray-500">{user.email}</p>
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50">
+                {/* Header */}
+                <div className="px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600">
+                  <p className="text-sm font-semibold text-white truncate">{user.name}</p>
+                  <p className="text-xs text-teal-50 truncate">{user.email}</p>
                 </div>
+
+                {/* Dashboard - Highlighted */}
                 <Link
-                  href="/profile"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  href="/dashboard"
+                  className="flex items-center gap-3 px-4 py-3 bg-teal-50 border-b border-gray-200 hover:bg-teal-100 transition-colors group"
+                  onClick={() => setIsUserMenuOpen(false)}
                 >
-                  Thông tin cá nhân
+                  <FaHome className="text-teal-600 text-lg" />
+                  <span className="text-sm font-semibold text-teal-700 group-hover:text-teal-800">Dashboard</span>
                 </Link>
-                <Link
-                  href="/my-posts"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Bài đăng của tôi
-                </Link>
-                {user.role !== 'landlord' && (
-                  <>
-                    <Link
-                      href="/my-rentals"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Đăng ký thuê
-                    </Link>
-                    <Link
-                      href="/my-rooms"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Phòng của tôi
-                    </Link>
-                    <Link
-                      href="/payments"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      Hóa đơn đã thanh toán
-                    </Link>
-                  </>
-                )}
-                <Link
-                  href="/favorites"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Yêu thích
-                </Link>
-                {user.role === 'landlord' && (
-                  <>
-                    <div className="my-2 border-t border-gray-100" />
-                    <p className="px-4 pb-1 text-xs font-semibold text-gray-500 uppercase">Quản lý</p>
-                    <Link
-                      href="/landlord"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      Yêu cầu thuê
-                    </Link>
-                    <Link
-                      href="/landlord/buildings"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      Quản lý tòa nhà
-                    </Link>
-                    <Link
-                      href="/landlord/billing"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      Tính tiền
-                    </Link>
-                    <Link
-                      href="/landlord/stats"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      Thống kê
-                    </Link>
-                  </>
-                )}
-                <div className="border-t border-gray-100 mt-2 pt-2">
+
+                {/* Menu Items */}
+                <div className="py-2">
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  >
+                    <FaUser className="text-gray-400 w-4" />
+                    <span>Thông tin cá nhân</span>
+                  </Link>
+                  
+                  <Link
+                    href="/my-posts"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  >
+                    <FaFileAlt className="text-gray-400 w-4" />
+                    <span>Bài đăng của tôi</span>
+                  </Link>
+
+                  {user.role !== 'landlord' && (
+                    <>
+                      <Link
+                        href="/my-rentals"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaClipboardCheck className="text-gray-400 w-4" />
+                        <span>Đăng ký thuê</span>
+                      </Link>
+                      
+                      <Link
+                        href="/my-rooms"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaDoorOpen className="text-gray-400 w-4" />
+                        <span>Phòng của tôi</span>
+                      </Link>
+                      
+                      <Link
+                        href="/payments"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaCreditCard className="text-gray-400 w-4" />
+                        <span>Hóa đơn thanh toán</span>
+                      </Link>
+                    </>
+                  )}
+
+                  <Link
+                    href="/favorites"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  >
+                    <FaHeart className="text-gray-400 w-4" />
+                    <span>Yêu thích</span>
+                  </Link>
+
+                  {user.role === 'landlord' && (
+                    <>
+                      <div className="my-2 border-t border-gray-100" />
+                      <div className="px-4 py-1.5">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Quản lý</p>
+                      </div>
+                      
+                      <Link
+                        href="/landlord"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaClipboardList className="text-gray-400 w-4" />
+                        <span>Yêu cầu thuê</span>
+                      </Link>
+                      
+                      <Link
+                        href="/landlord/buildings"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaBuilding className="text-gray-400 w-4" />
+                        <span>Tòa nhà</span>
+                      </Link>
+                      
+                      <Link
+                        href="/landlord/billing"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaMoneyBillWave className="text-gray-400 w-4" />
+                        <span>Tính tiền</span>
+                      </Link>
+                      
+                      <Link
+                        href="/landlord/stats"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        <FaChartBar className="text-gray-400 w-4" />
+                        <span>Thống kê</span>
+                      </Link>
+                    </>
+                  )}
+                </div>
+
+                {/* Logout */}
+                <div className="border-t border-gray-200 pt-2 pb-2">
                   <button
                     onClick={logout}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
                   >
-                    Đăng xuất
+                    <FaSignOutAlt className="text-red-500 w-4" />
+                    <span className="font-medium">Đăng xuất</span>
                   </button>
                 </div>
               </div>

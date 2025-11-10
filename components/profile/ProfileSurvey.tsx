@@ -10,6 +10,7 @@ import { AgeUtils } from "@/utils/ageUtils";
 import { User } from "@/types/User";
 import { loginService } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
   return (
@@ -38,6 +39,8 @@ function FieldBox({ label, children, className = "", required = false }: { label
 }
 
 export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
+  const { showSuccess } = useToast();
+  
   // Theo tài liệu: landlord không cần profile, chỉ cần verification
   if (role === "landlord") {
     return (
@@ -388,8 +391,10 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
         }
         
         // Redirect về trang login
-        alert("✅ Đăng ký thành công! Vui lòng đăng nhập.");
-        router.push("/login");
+        showSuccess('Đăng ký thành công', 'Vui lòng đăng nhập để tiếp tục!');
+        setTimeout(() => {
+          router.push("/login");
+        }, 1500);
       } else {
         // Nếu user đã đăng nhập và đang edit profile -> về trang chủ
         router.push("/");

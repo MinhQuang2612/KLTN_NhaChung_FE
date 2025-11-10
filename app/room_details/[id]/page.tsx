@@ -10,14 +10,29 @@ import MapSection from "../../../components/room_details/MapSection";
 import Suggestions from "../../../components/common/Suggestions";
 import Footer from "../../../components/common/Footer";
 import { getPostById } from "../../../services/posts";
-import { getReviewsByTarget } from "@/services/reviews";
+import { getReviewsByTarget, voteReview, deleteReview } from "@/services/reviews";
 import { getUserById } from "@/services/user";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { createReview } from "@/services/reviews";
+import { createReview, Reply } from "@/services/reviews";
 import { uploadFiles } from "@/utils/upload";
 import { extractApiErrorMessage } from "@/utils/api";
 import { Post } from "../../../types/Post";
+import ReplyList from "@/components/common/ReplyList";
+import ReplyForm from "@/components/common/ReplyForm";
+import { 
+  FaThumbsUp, 
+  FaThumbsDown, 
+  FaPoll, 
+  FaSync, 
+  FaLightbulb, 
+  FaTimes, 
+  FaCheck,
+  FaComment,
+  FaUserCircle,
+  FaTrash,
+  FaEdit
+} from 'react-icons/fa';
 
 
 type PostType = 'rent' | 'roommate';
@@ -44,6 +59,18 @@ export default function RoomDetailsPage() {
   const [media, setMedia] = useState<string[]>([]);
   const [uploaderVersion, setUploaderVersion] = useState<number>(0);
   const { showError, showSuccess } = useToast();
+  
+  // Reply states
+  const [showReplyFormForReviewId, setShowReplyFormForReviewId] = useState<number | null>(null);
+  const [editingReply, setEditingReply] = useState<Reply | null>(null);
+  const [expandedRepliesReviewId, setExpandedRepliesReviewId] = useState<number | null>(null);
+  
+  // Vote states
+  const [voteModalReviewId, setVoteModalReviewId] = useState<number | null>(null);
+  const [voteChoice, setVoteChoice] = useState<'helpful' | 'unhelpful' | null>(null);
+  
+  // Delete state
+  const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
 
   // Extract postType and postId from params
   // URL format: /room_details/rent-123 or /room_details/roommate-456
@@ -114,7 +141,15 @@ export default function RoomDetailsPage() {
       if (!postData?.postId) return;
       try {
         setReviewsLoading(true);
-        const res = await getReviewsByTarget({ targetType: 'POST', targetId: Number(postData.postId), sort: 'recent', page: 1, pageSize: 10 });
+        const userId = user ? Number((user as any).userId ?? (user as any).id) : undefined;
+        const res = await getReviewsByTarget({ 
+          targetType: 'POST', 
+          targetId: Number(postData.postId), 
+          sort: 'recent', 
+          page: 1, 
+          pageSize: 10,
+          userId // Pass userId to get myVote and replies
+        });
         const items = res?.items || [];
         setReviews(items);
 
@@ -135,7 +170,39 @@ export default function RoomDetailsPage() {
       }
     };
     loadReviews();
-  }, [postData?.postId]);
+  }, [postData?.postId, user]);
+
+  const reloadReviews = async () => {
+    if (!postData?.postId) return;
+    try {
+      setReviewsLoading(true);
+      const userId = user ? Number((user as any).userId ?? (user as any).id) : undefined;
+      const res = await getReviewsByTarget({ 
+        targetType: 'POST', 
+        targetId: Number(postData.postId), 
+        sort: 'recent', 
+        page: 1, 
+        pageSize: 10,
+        userId
+      });
+      const items = res?.items || [];
+      setReviews(items);
+
+      const uniqueWriterIds = Array.from(new Set(items.map((r: any) => r?.isAnonymous ? null : r?.writerId).filter(Boolean)));
+      const idToProfile: Record<number, { name?: string; avatar?: string }> = {};
+      await Promise.all(uniqueWriterIds.map(async (uid: number) => {
+        try {
+          const u = await getUserById(uid);
+          idToProfile[uid] = { name: u?.name, avatar: u?.avatar };
+        } catch {}
+      }));
+      setReviewAuthorMap(idToProfile);
+    } catch {
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -330,17 +397,80 @@ export default function RoomDetailsPage() {
                 <div className="space-y-4">
                   {reviews.map((r) => (
                     <div key={r.reviewId} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-gray-900 text-sm">
-                          {r.isAnonymous ? 'Ẩn danh' : (reviewAuthorMap[r.writerId]?.name || `Khách hàng #${r.writerId}`)}
-                        </p>
-                        <p className="text-xs text-gray-500">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : ''}</p>
+                      {/* Review Header with Avatar */}
+                      <div className="flex items-start gap-3 mb-2">
+                        {/* Avatar */}
+                        {r.isAnonymous || !reviewAuthorMap[r.writerId]?.avatar ? (
+                          <FaUserCircle className="w-10 h-10 text-gray-400 flex-shrink-0" />
+                        ) : (
+                          <img
+                            src={reviewAuthorMap[r.writerId].avatar}
+                            alt={reviewAuthorMap[r.writerId].name || 'User'}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
+                          />
+                        )}
+                        
+                        {/* Name, Date, Rating */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold text-gray-900 text-sm truncate">
+                              {r.isAnonymous ? 'Ẩn danh' : (reviewAuthorMap[r.writerId]?.name || `Khách hàng #${r.writerId}`)}
+                            </p>
+                            <p className="text-xs text-gray-500 whitespace-nowrap">
+                              {r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : ''}
+                            </p>
+                          </div>
+                          <div className="text-yellow-400 text-sm mt-0.5">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <span key={i}>{i < (r.rating || 0) ? '★' : '☆'}</span>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-yellow-400 text-xs mt-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <span key={i}>{i < (r.rating || 0) ? '★' : '☆'}</span>
-                        ))}
-                      </div>
+                      
+                      {/* Review Actions (Edit/Delete) - Only for review owner */}
+                      {user && r.writerId === Number((user as any).userId ?? (user as any).id) && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // TODO: Implement edit functionality
+                              showError('Chức năng sửa đánh giá đang được phát triển');
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                          >
+                            <FaEdit className="w-3 h-3" />
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm('Bạn có chắc muốn xóa đánh giá này?')) {
+                                return;
+                              }
+                              
+                              setDeletingReviewId(r.reviewId);
+                              try {
+                                await deleteReview(r.reviewId, Number((user as any).userId ?? (user as any).id));
+                                showSuccess('Đã xóa đánh giá');
+                                // Reload reviews
+                                reloadReviews();
+                              } catch (error: any) {
+                                console.error('Error deleting review:', error);
+                                showError(error.message || 'Không thể xóa đánh giá');
+                              } finally {
+                                setDeletingReviewId(null);
+                              }
+                            }}
+                            disabled={deletingReviewId === r.reviewId}
+                            className="text-xs text-red-600 hover:text-red-800 hover:underline flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                            {deletingReviewId === r.reviewId ? 'Đang xóa...' : 'Xóa'}
+                          </button>
+                        </div>
+                      )}
+                      
                       {r.content && (
                         <p className="mt-2 text-sm text-gray-700">{r.content}</p>
                       )}
@@ -358,16 +488,122 @@ export default function RoomDetailsPage() {
                           ))}
                         </div>
                       )}
-                      <div className="mt-2 flex items-center gap-4 text-xs">
-                        <span className="inline-flex items-center gap-1 text-teal-700">
-                          <span>Hữu ích</span>
-                          <span className="px-1 rounded bg-teal-50 border border-teal-200 text-teal-700">{r.votesHelpful ?? 0}</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-gray-600">
-                          <span>Không hữu ích</span>
-                          <span className="px-1 rounded bg-gray-100 border border-gray-300 text-gray-700">{r.votesUnhelpful ?? 0}</span>
-                        </span>
+                      {/* Vote Stats */}
+                      <div className="mt-2 flex items-center gap-3 text-xs">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-teal-50 rounded border border-teal-200">
+                          <FaThumbsUp className="w-3 h-3 text-teal-600" />
+                          <span className="font-semibold text-teal-700">{r.votesHelpful ?? 0}</span>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded border border-gray-200">
+                          <FaThumbsDown className="w-3 h-3 text-gray-600" />
+                          <span className="font-semibold text-gray-700">{r.votesUnhelpful ?? 0}</span>
+                        </div>
                       </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="flex-1 text-xs px-2 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:text-gray-400 flex items-center justify-center gap-1"
+                          disabled={!user}
+                          onClick={() => {
+                            if (showReplyFormForReviewId === r.reviewId) {
+                              setShowReplyFormForReviewId(null);
+                              setEditingReply(null);
+                            } else {
+                              setShowReplyFormForReviewId(r.reviewId);
+                              setEditingReply(null);
+                            }
+                          }}
+                        >
+                          <FaComment className="w-3 h-3" />
+                          {r.repliesCount ? `${r.repliesCount} phản hồi` : 'Trả lời'}
+                        </button>
+                        <button
+                          type="button"
+                          className={`flex-1 text-xs px-2 py-1.5 rounded font-medium transition-all flex items-center justify-center gap-1 ${
+                            (r as any).myVote === 'helpful' 
+                              ? 'bg-teal-600 text-white border border-teal-600 hover:bg-teal-700' 
+                              : (r as any).myVote === 'unhelpful'
+                              ? 'bg-gray-600 text-white border border-gray-600 hover:bg-gray-700'
+                              : 'border border-teal-400 text-teal-700 hover:bg-teal-50'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          disabled={!user}
+                          onClick={() => {
+                            setVoteModalReviewId(r.reviewId);
+                            setVoteChoice(null);
+                          }}
+                        >
+                          {(r as any).myVote ? (
+                            (r as any).myVote === 'helpful' ? (
+                              <>
+                                <FaCheck className="w-3 h-3" />
+                                Đã vote hữu ích
+                              </>
+                            ) : (
+                              <>
+                                <FaTimes className="w-3 h-3" />
+                                Đã vote không hữu ích
+                              </>
+                            )
+                          ) : (
+                            <>
+                              <FaPoll className="w-3 h-3" />
+                              Vote
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Replies Section */}
+                      {r.repliesCount > 0 && expandedRepliesReviewId !== r.reviewId && (
+                        <button
+                          type="button"
+                          className="mt-2 text-xs text-blue-600 hover:underline"
+                          onClick={() => setExpandedRepliesReviewId(r.reviewId)}
+                        >
+                          Xem {r.repliesCount} phản hồi
+                        </button>
+                      )}
+                      
+                      {expandedRepliesReviewId === r.reviewId && r.replies && r.replies.length > 0 && (
+                        <div>
+                          <ReplyList
+                            reviewId={r.reviewId}
+                            replies={r.replies}
+                            repliesCount={r.repliesCount || 0}
+                            onReplyUpdated={reloadReviews}
+                            onEditReply={(reply) => {
+                              setEditingReply(reply);
+                              setShowReplyFormForReviewId(r.reviewId);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+                            onClick={() => setExpandedRepliesReviewId(null)}
+                          >
+                            Ẩn phản hồi
+                          </button>
+                        </div>
+                      )}
+                      
+                      {showReplyFormForReviewId === r.reviewId && (
+                        <ReplyForm
+                          reviewId={r.reviewId}
+                          editingReply={editingReply}
+                          onCancel={() => {
+                            setShowReplyFormForReviewId(null);
+                            setEditingReply(null);
+                          }}
+                          onReplyCreated={() => {
+                            setShowReplyFormForReviewId(null);
+                            setEditingReply(null);
+                            reloadReviews();
+                            setExpandedRepliesReviewId(r.reviewId);
+                          }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -381,6 +617,141 @@ export default function RoomDetailsPage() {
       <Suggestions />
       
       <Footer />
+      
+      {/* Vote Modal */}
+      {voteModalReviewId != null && (() => {
+        const currentReview = reviews.find((r: any) => r.reviewId === voteModalReviewId);
+        const currentVote = currentReview ? (currentReview as any).myVote : null;
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 transform transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  {currentVote ? (
+                    <>
+                      <FaSync className="w-5 h-5 text-teal-600" />
+                      Thay đổi đánh giá
+                    </>
+                  ) : (
+                    <>
+                      <FaPoll className="w-5 h-5 text-teal-600" />
+                      Vote đánh giá
+                    </>
+                  )}
+                </h4>
+                <button 
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1.5 transition-all" 
+                  onClick={() => { setVoteModalReviewId(null); setVoteChoice(null); }}
+                >
+                  <FaTimes className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {currentVote && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                  <FaLightbulb className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-800">
+                    Bạn đã vote <span className="font-bold inline-flex items-center gap-1">
+                      {currentVote === 'helpful' ? (
+                        <>
+                          <FaThumbsUp className="w-3 h-3" />
+                          Hữu ích
+                        </>
+                      ) : (
+                        <>
+                          <FaThumbsDown className="w-3 h-3" />
+                          Không hữu ích
+                        </>
+                      )}
+                    </span>. Bạn có thể đổi sang lựa chọn khác.
+                  </p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <button
+                  type="button"
+                  disabled={currentVote === 'helpful'}
+                  onClick={() => setVoteChoice('helpful')}
+                  className={`px-5 py-4 rounded-xl border-2 transition-all font-semibold text-sm flex flex-col items-center gap-2 ${
+                    currentVote === 'helpful' 
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
+                      : voteChoice === 'helpful' 
+                        ? 'bg-gradient-to-br from-teal-500 to-teal-600 text-white border-teal-600 shadow-lg scale-105' 
+                        : 'border-teal-300 text-teal-700 hover:bg-teal-50 hover:border-teal-400 hover:shadow-md'
+                  }`}
+                >
+                  <FaThumbsUp className="w-8 h-8" />
+                  <span>Hữu ích</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={currentVote === 'unhelpful'}
+                  onClick={() => setVoteChoice('unhelpful')}
+                  className={`px-5 py-4 rounded-xl border-2 transition-all font-semibold text-sm flex flex-col items-center gap-2 ${
+                    currentVote === 'unhelpful' 
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
+                      : voteChoice === 'unhelpful' 
+                        ? 'bg-gradient-to-br from-gray-600 to-gray-700 text-white border-gray-700 shadow-lg scale-105' 
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md'
+                  }`}
+                >
+                  <FaThumbsDown className="w-8 h-8" />
+                  <span>Không hữu ích</span>
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
+                  onClick={() => { setVoteModalReviewId(null); setVoteChoice(null); }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={!user || !voteChoice}
+                  className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                    (!user || !voteChoice) 
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                  }`}
+                  onClick={async () => {
+                    if (!user || !voteChoice) return;
+                    const reviewId = voteModalReviewId as number;
+                    try {
+                      const response = await voteReview(reviewId, Number((user as any).userId ?? (user as any).id), voteChoice === 'helpful');
+                      
+                      // Update local state
+                      setReviews((prev: any[]) => prev.map(r => {
+                        if (r.reviewId !== reviewId) return r;
+                        return {
+                          ...r,
+                          votesHelpful: response.votesHelpful ?? r.votesHelpful,
+                          votesUnhelpful: response.votesUnhelpful ?? r.votesUnhelpful,
+                          myVote: voteChoice
+                        };
+                      }));
+                      
+                      showSuccess(currentVote ? 'Đã thay đổi vote thành công!' : 'Đã gửi vote thành công!');
+                      setVoteModalReviewId(null);
+                      setVoteChoice(null);
+                    } catch (err: any) {
+                      const errorMsg = extractApiErrorMessage(err);
+                      showError(errorMsg);
+                    }
+                  }}
+                >
+                  <FaCheck className="w-4 h-4" />
+                  {currentVote ? 'Thay đổi vote' : 'Gửi vote'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

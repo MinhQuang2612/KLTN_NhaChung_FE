@@ -2,6 +2,19 @@ import { apiGet, apiPost, apiPatch, apiDel } from "@/utils/api";
 
 export type ReviewTargetType = "USER" | "ROOM" | "BUILDING" | "POST";
 
+export interface Reply {
+  replyId: number;
+  userId: number;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  media?: string[]; // URLs của ảnh đính kèm (max 3)
+  isAuthor: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  isEdited: boolean;
+}
+
 export interface Review {
   reviewId: number;
   writerId: number;
@@ -15,6 +28,10 @@ export interface Review {
   isEdited?: boolean;
   votesHelpful?: number;
   votesUnhelpful?: number;
+  myVote?: 'helpful' | 'unhelpful' | null;
+  replies?: Reply[];
+  repliesCount?: number;
+  isAuthor?: boolean; // Badge "Tác giả" nếu writerId là owner của target
   createdAt: string;
   updatedAt?: string;
 }
@@ -53,6 +70,7 @@ export function getReviewsByTarget(params: {
   sort?: "recent" | "top";
   page?: number;
   pageSize?: number;
+  userId?: number; // Thêm userId để backend check myVote
 }) {
   const sp = new URLSearchParams();
   sp.append("targetType", params.targetType);
@@ -62,6 +80,7 @@ export function getReviewsByTarget(params: {
   if (params.sort) sp.append("sort", params.sort);
   if (params.page != null) sp.append("page", String(params.page));
   if (params.pageSize != null) sp.append("pageSize", String(params.pageSize));
+  if (params.userId != null) sp.append("userId", String(params.userId)); // Thêm userId
   const qs = sp.toString();
   return apiGet<ReviewsQueryResponse>(`${BASE}${qs ? `?${qs}` : ""}`);
 }
@@ -78,6 +97,7 @@ export function getAllReviews(params?: {
   hasMedia?: boolean;
   targetType?: ReviewTargetType;
   rating?: number;
+  userId?: number; // Thêm userId để backend check myVote
 }) {
   const sp = new URLSearchParams();
   if (params?.sort) sp.append('sort', params.sort);
@@ -86,6 +106,7 @@ export function getAllReviews(params?: {
   if (params?.hasMedia != null) sp.append('hasMedia', String(params.hasMedia));
   if (params?.targetType) sp.append('targetType', params.targetType);
   if (params?.rating != null) sp.append('rating', String(params.rating));
+  if (params?.userId != null) sp.append('userId', String(params.userId)); // Thêm userId
   const qs = sp.toString();
   return apiGet<{
     items: Review[];
@@ -110,4 +131,37 @@ export function voteReview(reviewId: number, userId: number, isHelpful: boolean)
   return apiPost<Review>(`${BASE}/${reviewId}/vote?userId=${userId}`, { isHelpful });
 }
 
+// ==================== REPLY APIs ====================
+
+export interface CreateReplyPayload {
+  content: string;
+  userId: number;
+  media?: string[]; // URLs của ảnh đính kèm (max 3)
+}
+
+export interface CreateReplyResponse {
+  reviewId: number;
+  reply: Reply;
+}
+
+export interface DeleteReplyResponse {
+  message: string;
+  reviewId: number;
+  replyId: number;
+}
+
+export function createReply(reviewId: number, payload: CreateReplyPayload) {
+  // POST /reviews/{reviewId}/replies
+  return apiPost<CreateReplyResponse>(`${BASE}/${reviewId}/replies`, payload);
+}
+
+export function updateReply(reviewId: number, replyId: number, payload: CreateReplyPayload) {
+  // PATCH /reviews/{reviewId}/replies/{replyId}
+  return apiPatch<CreateReplyResponse>(`${BASE}/${reviewId}/replies/${replyId}`, payload);
+}
+
+export function deleteReply(reviewId: number, replyId: number, userId: number) {
+  // DELETE /reviews/{reviewId}/replies/{replyId}?userId=xxx
+  return apiDel<DeleteReplyResponse>(`${BASE}/${reviewId}/replies/${replyId}?userId=${userId}`);
+}
 

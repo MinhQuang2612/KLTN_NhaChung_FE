@@ -4,17 +4,25 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserRooms, UserRoom } from '@/services/rooms';
 import { getUserRentalRequests } from '@/services/rentalRequests';
+import { terminateContract, getRentalHistory } from '@/services/rentalHistory';
 import Link from 'next/link';
 import { createReview } from '@/services/reviews';
 import { useToast } from '@/contexts/ToastContext';
 import { extractApiErrorMessage } from '@/utils/api';
 import { uploadFiles } from '@/utils/upload';
+import RentalHistory from '@/components/rental/RentalHistory';
+import TerminateContractModal from '@/components/rental/TerminateContractModal';
 
 const MyRoomsPage = () => {
   const { user, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [rooms, setRooms] = useState<UserRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [terminatingContract, setTerminatingContract] = useState<number | null>(null);
+  const [historyCount, setHistoryCount] = useState<number>(0);
+  const [showTerminateModal, setShowTerminateModal] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<{ id: number; roomNumber: string } | null>(null);
   const [ratings, setRatings] = useState<Record<number, number>>({});
   const [reviews, setReviews] = useState<Record<number, string>>({});
   const [anonymousMap, setAnonymousMap] = useState<Record<number, boolean>>({});
@@ -31,8 +39,20 @@ const MyRoomsPage = () => {
   useEffect(() => {
     if (!isLoading && user) {
       loadMyRooms();
+      loadHistoryCount();
     }
   }, [user, isLoading]);
+
+  const loadHistoryCount = async () => {
+    try {
+      // Chỉ gọi API để lấy count, không cần lấy data
+      const response = await getRentalHistory({ page: 1, limit: 1 });
+      setHistoryCount(response.pagination?.total || 0);
+    } catch (error) {
+      // Nếu lỗi thì set 0, không show error
+      setHistoryCount(0);
+    }
+  };
 
   const loadMyRooms = async () => {
     try {
@@ -55,6 +75,47 @@ const MyRoomsPage = () => {
       setError('Không thể tải danh sách phòng. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTerminateContract = (contractId: number, roomNumber: string) => {
+    setSelectedContract({ id: contractId, roomNumber });
+    setShowTerminateModal(true);
+  };
+
+  const handleConfirmTerminate = async (reason: string) => {
+    if (!selectedContract) return;
+
+    try {
+      setTerminatingContract(selectedContract.id);
+      const response = await terminateContract(
+        selectedContract.id, 
+        reason.trim() ? { reason: reason.trim() } : undefined
+      );
+      
+      // Message với số lượng posts được active
+      const postsMsg = response.affectedPosts?.count 
+        ? ` Đã active lại ${response.affectedPosts.count} bài đăng.`
+        : '';
+      showSuccess('Đã hủy hợp đồng', `Hợp đồng đã được hủy và phòng đã được giải phóng.${postsMsg}`);
+      
+      // Close modal
+      setShowTerminateModal(false);
+      setSelectedContract(null);
+      
+      // Reload rooms
+      await loadMyRooms();
+      
+      // Reload history count
+      await loadHistoryCount();
+      
+      // Chuyển sang tab lịch sử
+      setActiveTab('history');
+    } catch (error: any) {
+      const message = extractApiErrorMessage(error);
+      showError('Không thể hủy hợp đồng', message);
+    } finally {
+      setTerminatingContract(null);
     }
   };
 
@@ -92,10 +153,51 @@ const MyRoomsPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Phòng của tôi</h1>
-          <p className="text-gray-600">Danh sách các phòng bạn đã thuê</p>
+          <p className="text-gray-600">Quản lý phòng đang thuê và lịch sử thuê</p>
         </div>
 
-        {loading ? (
+        {/* Tabs */}
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('current')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'current'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Phòng đang thuê
+              {rooms.filter(room => room.contractStatus === 'active').length > 0 && (
+                <span className="ml-2 py-0.5 px-2 rounded-full bg-teal-100 text-teal-600 text-xs font-semibold">
+                  {rooms.filter(room => room.contractStatus === 'active').length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'history'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Lịch sử thuê
+              {historyCount > 0 && (
+                <span className="ml-2 py-0.5 px-2 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">
+                  {historyCount}
+                </span>
+              )}
+            </button>
+          </nav>
+        </div>
+
+        {/* Content */}
+        {activeTab === 'history' ? (
+          <RentalHistory onCountChange={setHistoryCount} />
+        ) : (
+          <>
+            {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Đang tải danh sách phòng...</p>
@@ -112,7 +214,7 @@ const MyRoomsPage = () => {
               </button>
             </div>
           </div>
-        ) : rooms.length === 0 ? (
+        ) : rooms.filter(room => room.contractStatus === 'active').length === 0 ? (
           <div className="text-center py-12">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -132,7 +234,7 @@ const MyRoomsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rooms.map((room) => (
+            {rooms.filter(room => room.contractStatus === 'active').map((room) => (
               <div key={room.roomId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   {/* Header */}
@@ -224,13 +326,33 @@ const MyRoomsPage = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-4">
+                  <div className="pt-4 space-y-2">
                     <Link 
                       href={`/contracts/${room.contractId}`}
-                      className="w-full bg-blue-600 text-white text-center py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium inline-block"
+                      className="w-full bg-teal-600 text-white text-center py-2 px-4 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium inline-block"
                     >
                       Xem hợp đồng
                     </Link>
+                    
+                    {room.contractStatus === 'active' && (
+                      <button
+                        onClick={() => handleTerminateContract(room.contractId, room.roomNumber)}
+                        disabled={terminatingContract === room.contractId}
+                        className="w-full bg-red-600 text-white text-center py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {terminatingContract === room.contractId ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                            </svg>
+                            Đang xử lý...
+                          </span>
+                        ) : (
+                          'Hủy hợp đồng'
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Đánh giá (gộp) */}
@@ -492,6 +614,20 @@ const MyRoomsPage = () => {
             ))}
           </div>
         )}
+          </>
+        )}
+
+        {/* Terminate Contract Modal */}
+        <TerminateContractModal
+          isOpen={showTerminateModal}
+          roomNumber={selectedContract?.roomNumber || ''}
+          onClose={() => {
+            setShowTerminateModal(false);
+            setSelectedContract(null);
+          }}
+          onConfirm={handleConfirmTerminate}
+          isLoading={terminatingContract !== null}
+        />
       </div>
     </div>
   );

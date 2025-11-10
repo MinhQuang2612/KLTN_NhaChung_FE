@@ -8,9 +8,11 @@ import ProfileHeader from "../../components/profile/ProfileHeader";
 import ProfileForm from "../../components/profile/ProfileForm";
 import AccountSettings from "../../components/profile/AccountSettings";
 import { VerificationData } from "../../types/User";
+import { useToast } from "../../contexts/ToastContext";
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const { showSuccess, showError, showWarning } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isVerified, setIsVerified] = useState(false); // Trạng thái xác thực
   const [formData, setFormData] = useState({
@@ -52,16 +54,19 @@ export default function ProfilePage() {
         } catch (avatarError: any) {
           // Hiển thị thông báo CORS và tiếp tục
           if (avatarError.message?.includes('CORS')) {
-            alert(
-              "⚠️ Upload avatar thất bại - CORS Error\n\n" +
+            showWarning(
+              'Upload avatar thất bại - CORS Error',
               "Cần yêu cầu Backend config S3 CORS policy:\n" +
-              "- Thêm origin: http://localhost:3000\n" +
-              "- Allow methods: GET, PUT, POST\n" +
-              "- Allow headers: *\n\n" +
+              "• Thêm origin: http://localhost:3000\n" +
+              "• Allow methods: GET, PUT, POST\n" +
+              "• Allow headers: *\n\n" +
               "Thông tin khác sẽ được lưu bình thường."
             );
           } else {
-            alert("⚠️ Upload avatar thất bại: " + avatarError.message + "\n\nThông tin khác sẽ được lưu bình thường.");
+            showWarning(
+              'Upload avatar thất bại',
+              avatarError.message + "\n\nThông tin khác sẽ được lưu bình thường."
+            );
           }
           setAvatarPreview("");
           setSelectedAvatarFile(null);
@@ -80,9 +85,9 @@ export default function ProfilePage() {
       }
       
       setIsEditing(false);
-      alert("✅ Cập nhật thông tin thành công!");
-    } catch (error) {
-      alert("❌ Có lỗi xảy ra khi cập nhật thông tin: " + error);
+      showSuccess('Cập nhật thành công', 'Thông tin cá nhân đã được cập nhật thành công!');
+    } catch (error: any) {
+      showError('Cập nhật thất bại', error?.message || 'Có lỗi xảy ra khi cập nhật thông tin');
     }
   };
 

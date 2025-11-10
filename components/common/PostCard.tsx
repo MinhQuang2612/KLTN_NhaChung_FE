@@ -1,16 +1,22 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { RoomCardData } from "@/types/RentPostApi";
 import { useFavorites } from "../../contexts/FavoritesContext";
 import { formatPrice } from "@/utils/format";
 import { addressService } from "../../services/address";
+import { getReviewsByTarget } from "../../services/reviews";
+import { FaStar } from "react-icons/fa";
 
 type PostCardProps = RoomCardData & {
   highlight?: {
     title?: string;
     address?: string;
     description?: string;
+  };
+  rating?: {
+    avg: number;
+    count: number;
   };
 };
 
@@ -44,13 +50,38 @@ export default function PostCard({
   price,
   isVerified,
   highlight,
+  rating: propRating,
 }: PostCardProps) {
   const router = useRouter();
   const { isFavorited, toggleFavorite } = useFavorites();
+  const [rating, setRating] = useState<{ avg: number; count: number } | null>(propRating || null);
   
   // Check if this post is favorited  
   const postType = category === 'roommate' ? 'roommate' : 'rent';
   const isFav = isFavorited(postType, rentPostId);
+
+  // Fetch rating if not provided
+  useEffect(() => {
+    if (!propRating && rentPostId) {
+      getReviewsByTarget({
+        targetType: 'POST',
+        targetId: rentPostId,
+        page: 1,
+        pageSize: 1
+      })
+        .then((data) => {
+          if (data.ratingSummary && data.ratingSummary.ratingCount > 0) {
+            setRating({
+              avg: data.ratingSummary.ratingAvg,
+              count: data.ratingSummary.ratingCount
+            });
+          }
+        })
+        .catch(() => {
+          // Silently fail
+        });
+    }
+  }, [rentPostId, propRating]);
 
   const goDetail = () => {
     const postType = category === 'roommate' ? 'roommate' : 'rent';
@@ -82,6 +113,21 @@ export default function PostCard({
         {isVerified && (
           <div className="absolute top-2 left-2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md group-hover:bg-teal-600 transition-colors duration-300">
             Đã Xác Thực
+          </div>
+        )}
+
+        {/* Rating Badge */}
+        {rating && (
+          <div className="absolute top-2 left-2 bg-white/95 backdrop-blur-sm px-2.5 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 z-10"
+            style={{ marginTop: isVerified ? '2.5rem' : '0' }}
+          >
+            <FaStar className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-gray-900">
+              {rating.avg.toFixed(1)}
+            </span>
+            <span className="text-xs text-gray-500">
+              ({rating.count})
+            </span>
           </div>
         )}
 

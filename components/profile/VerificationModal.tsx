@@ -6,6 +6,7 @@ import { VerificationData, FaceMatchResult } from "../../types/User";
 import { compareFaces, getStatusMessage, validateFaceMatchResult, createFaceMatchResult } from "../../services/faceMatch";
 import { processOCRWithFPT } from "../../services/ocr";
 import { VERIFICATION_CONSTANTS } from "../../utils/verificationConstants";
+import NotificationToast from "../common/NotificationToast";
 
 interface VerificationModalProps {
   isOpen: boolean;
@@ -26,6 +27,23 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
   const [isProcessing, setIsProcessing] = useState(false);
   const [isFaceMatching, setIsFaceMatching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Notification state
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
+
+  const showNotification = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string) => {
+    setNotification({ isOpen: true, type, title, message });
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'face') => {
     const file = e.target.files?.[0];
@@ -55,7 +73,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
 
   const handleFaceMatch = async () => {
     if (!frontImage || !faceImage) {
-      alert('⚠️ Vui lòng tải lên đầy đủ ảnh CCCD và ảnh khuôn mặt');
+      showNotification('warning', 'Thiếu ảnh', 'Vui lòng tải lên đầy đủ ảnh CCCD và ảnh khuôn mặt');
       return;
     }
 
@@ -66,13 +84,17 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
       
       const statusMessage = getStatusMessage(result);
       const message = result.similarity >= 50 
-        ? `✅ ${statusMessage}\n\nBạn sẽ được tự động xác thực!`
-        : `⚠️ ${statusMessage}\n\nHồ sơ của bạn sẽ được admin xem xét.`;
+        ? `${statusMessage}\n\nBạn sẽ được tự động xác thực!`
+        : `${statusMessage}\n\nHồ sơ của bạn sẽ được admin xem xét.`;
       
-      alert(message);
+      showNotification(
+        result.similarity >= 50 ? 'success' : 'warning',
+        result.similarity >= 50 ? 'So sánh thành công' : 'Cần xem xét',
+        message
+      );
       setStep('review');
     } catch (error: any) {
-      alert('❌ Lỗi khi so sánh khuôn mặt: ' + error.message);
+      showNotification('error', 'Lỗi so sánh khuôn mặt', error.message || 'Không thể so sánh khuôn mặt. Vui lòng thử lại.');
     } finally {
       setIsFaceMatching(false);
     }
@@ -146,7 +168,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
       
       if (totalSize > VERIFICATION_CONSTANTS.MAX_TOTAL_SIZE) {
         const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
-        alert(`⚠️ ${VERIFICATION_CONSTANTS.MESSAGES.IMAGE_TOO_LARGE} (${sizeInMB}MB)`);
+        showNotification('warning', 'Ảnh quá lớn', `${VERIFICATION_CONSTANTS.MESSAGES.IMAGE_TOO_LARGE} (${sizeInMB}MB)`);
         return null;
       }
       
@@ -167,7 +189,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
     })();
 
     if (!normalized) {
-      alert(`⚠️ ${VERIFICATION_CONSTANTS.MESSAGES.REQUIRED_FIELDS}`);
+      showNotification('warning', 'Thiếu thông tin', VERIFICATION_CONSTANTS.MESSAGES.REQUIRED_FIELDS);
       return;
     }
 
@@ -186,10 +208,14 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
       
       // Hiển thị thông báo theo status từ backend - theo API guide mới
       const message = response.verification.status === 'approved'
-        ? `✅ Hồ sơ đã được xác thực thành công!\n\nBạn đã được tự động xác thực nhờ AI so sánh khuôn mặt.\nĐộ tương đồng: ${response.verification.faceMatchResult?.similarity || 0}%\nConfidence: ${response.verification.faceMatchResult?.confidence || 'high'}`
-        : `✅ ${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_SUCCESS}\n\nHồ sơ của bạn đang chờ admin xem xét.\nĐộ tương đồng: ${response.verification.faceMatchResult?.similarity || 0}%\nConfidence: ${response.verification.faceMatchResult?.confidence || 'low'}`;
+        ? `Hồ sơ đã được xác thực thành công!\n\nBạn đã được tự động xác thực nhờ AI so sánh khuôn mặt.\nĐộ tương đồng: ${response.verification.faceMatchResult?.similarity || 0}%\nConfidence: ${response.verification.faceMatchResult?.confidence || 'high'}`
+        : `${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_SUCCESS}\n\nHồ sơ của bạn đang chờ admin xem xét.\nĐộ tương đồng: ${response.verification.faceMatchResult?.similarity || 0}%\nConfidence: ${response.verification.faceMatchResult?.confidence || 'low'}`;
       
-      alert(message);
+      showNotification(
+        response.verification.status === 'approved' ? 'success' : 'info',
+        response.verification.status === 'approved' ? 'Xác thực thành công' : 'Đã gửi hồ sơ',
+        message
+      );
       onVerify(normalized);
       
       setStep('success');
@@ -208,7 +234,11 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
       if (error.message?.includes('request entity too large') || error.message?.includes('413')) {
         try {
           await submitVerification({ ...normalized, images: undefined });
-          alert(`✅ ${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_SUCCESS_WITHOUT_IMAGES}\n\nHồ sơ của bạn đang chờ admin xem xét.\nẢnh sẽ được admin xem xét riêng.`);
+          showNotification(
+            'success',
+            'Đã gửi hồ sơ',
+            `${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_SUCCESS_WITHOUT_IMAGES}\n\nHồ sơ của bạn đang chờ admin xem xét.\nẢnh sẽ được admin xem xét riêng.`
+          );
           onVerify(normalized);
           setStep('success');
           setTimeout(() => {
@@ -222,10 +252,18 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
           }, 2000);
           return;
         } catch (retryError: any) {
-          alert(`❌ ${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_ERROR} ${retryError.message || 'Vui lòng thử lại'}`);
+          showNotification(
+            'error',
+            'Lỗi gửi hồ sơ',
+            `${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_ERROR} ${retryError.message || 'Vui lòng thử lại'}`
+          );
         }
       } else {
-        alert(`❌ ${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_ERROR} ${error.message || 'Vui lòng thử lại'}`);
+        showNotification(
+          'error',
+          'Lỗi gửi hồ sơ',
+          `${VERIFICATION_CONSTANTS.MESSAGES.SUBMIT_ERROR} ${error.message || 'Vui lòng thử lại'}`
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -406,7 +444,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
                       } catch (error) {
                         // OCR processing failed
                         // Show error message to user
-                        alert('Không thể xử lý ảnh CCCD/CMND. Vui lòng thử lại hoặc kiểm tra kết nối mạng.');
+                        showNotification('error', 'Lỗi xử lý ảnh', 'Không thể xử lý ảnh CCCD/CMND. Vui lòng thử lại hoặc kiểm tra kết nối mạng.');
                       } finally {
                         setIsProcessing(false);
                       }
@@ -707,6 +745,15 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
           )}
         </div>
       </div>
+
+      {/* Notification Toast */}
+      <NotificationToast
+        isOpen={notification.isOpen}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+      />
     </div>
   );
 }
