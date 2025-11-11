@@ -1,25 +1,43 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { getPosts } from "../../services/posts";
 import { getUserById } from "../../services/user";
 import { getReviewsByTarget } from "../../services/reviews";
+import { createOrGetConversation } from "../../services/chat";
 import { User } from "../../types/User";
+import { Post } from "../../types/Post";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
+import { useChat } from "../../contexts/ChatContext";
 import Link from "next/link";
-import { FaStar } from "react-icons/fa";
+import { FaStar, FaComments } from "react-icons/fa";
+import { extractApiErrorMessage } from "../../utils/api";
+
+// Extended Post type với các thuộc tính bổ sung từ API
+interface ExtendedPost extends Post {
+  userName?: string;
+  userAvatar?: string;
+  userCreatedAt?: string;
+  id?: number; // Alias cho postId
+}
 
 interface ContactCardProps {
-  postData: any;
+  postData: ExtendedPost;
   postType: 'rent' | 'roommate';
 }
 
 export default function ContactCard({ postData, postType }: ContactCardProps) {
   const { user } = useAuth();
+  const router = useRouter();
+  const { showError, showSuccess } = useToast();
+  const { openModalWithConversation } = useChat();
   const [userInfo, setUserInfo] = useState<User | null>(null);
   const [userStats, setUserStats] = useState<{ postsCount: number; joinedDate: string | null }>({ postsCount: 0, joinedDate: null });
   const [userRating, setUserRating] = useState<{ avg: number; count: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatingConversation, setCreatingConversation] = useState(false);
 
   // Check if user is viewing their own post or if user is landlord
   const shouldHideButtons = user?.role === 'landlord' || user?.userId === postData?.userId;
@@ -65,13 +83,13 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
           setUserInfo(user.value);
         } else {
           // Fallback to postData if API fails
-          const userInfoFromPost = {
+          const userInfoFromPost: User = {
             userId: postData.userId,
             name: postData.userName || 'Người dùng',
             email: postData.email || '',
             phone: postData.phone || '',
-            avatar: postData.userAvatar || null,
-            createdAt: postData.userCreatedAt || null,
+            avatar: postData.userAvatar || undefined,
+            createdAt: postData.userCreatedAt || undefined,
           };
           setUserInfo(userInfoFromPost);
         }
@@ -123,6 +141,51 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
       window.removeEventListener('focus', handleFocus);
     };
   }, [postData?.userId, refreshUserStats]);
+
+  const handleContactClick = async () => {
+    if (!user || !postData?.userId) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      setCreatingConversation(true);
+      const currentUserId = Number((user as any).userId ?? (user as any).id);
+      const landlordId = postData.userId;
+      const currentPostId = postData.postId || (postData as ExtendedPost).id;
+
+      // Determine tenant and landlord
+      // If current user is the landlord, they can't contact themselves
+      if (currentUserId === landlordId) {
+        showError('Lỗi', 'Bạn không thể liên hệ với chính mình');
+        return;
+      }
+
+      // Create or get conversation
+      // Backend sẽ tự động tạo system message nếu chưa có tin nhắn về postId này
+      const conversation = await createOrGetConversation({
+        tenantId: currentUserId,
+        landlordId: landlordId,
+        postId: currentPostId,
+        roomId: postData.roomId,
+      });
+
+      // Kiểm tra conversation có đúng không
+      if (conversation.tenantId !== currentUserId && conversation.landlordId !== currentUserId) {
+        showError('Lỗi', 'Conversation được tạo nhưng bạn không có quyền truy cập');
+        return;
+      }
+
+      // Mở modal chat với conversation này
+      // Backend đã tự động tạo systemMessage nếu cần, không cần frontend gửi nữa
+      openModalWithConversation(conversation);
+      showSuccess('Thành công', 'Đã mở cuộc trò chuyện');
+    } catch (error: any) {
+      showError('Lỗi', extractApiErrorMessage(error) || 'Không thể tạo cuộc trò chuyện');
+    } finally {
+      setCreatingConversation(false);
+    }
+  };
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -246,8 +309,13 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
               '0789****'
             }
           </button>
-          <button className="w-full px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white font-medium rounded-lg transition-colors">
-            Chat Với Người {postType === 'roommate' ? 'Tìm Ghép' : 'Bán'}
+          <button 
+            onClick={handleContactClick}
+            disabled={creatingConversation || !user}
+            className="w-full px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white font-medium rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <FaComments className="w-4 h-4" />
+            {creatingConversation ? 'Đang tải...' : `Chat Với Người ${postType === 'roommate' ? 'Tìm Ghép' : 'Bán'}`}
           </button>
         </div>
       )}

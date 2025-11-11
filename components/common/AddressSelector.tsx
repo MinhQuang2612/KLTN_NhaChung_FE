@@ -219,7 +219,6 @@ export default function AddressSelector({ value, onChange, className = "", field
       (!showWard || wardNameResolved)
     ) {
       lastEmittedRef.current = serialized;
-      console.log('AddressSelector emitting onChange with:', emitted);
       onChange(emitted);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

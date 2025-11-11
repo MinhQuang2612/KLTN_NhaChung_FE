@@ -51,31 +51,12 @@ export default function LandlordRentalRequests() {
       setRentalLoading(true);
       const data = await getLandlordRentalRequests();
       
-      // Debug: Log để kiểm tra data từ API
-      console.log('🔍 [DEBUG] Raw data from getLandlordRentalRequests:', data);
-      console.log('🔍 [DEBUG] Data length:', data.length);
-      
-      // Debug: Log từng request để xem status và requestType
-      data.forEach((request, index) => {
-        console.log(`🔍 [DEBUG] Request #${index + 1}:`, {
-          requestId: request.requestId,
-          status: request.status,
-          message: request.message,
-          tenantId: request.tenantId,
-          requestType: (request as any).requestType, // Check if requestType exists
-          fullObject: request // Log toàn bộ object để xem có field nào khác
-        });
-      });
-      
       // Filter chỉ hiển thị rental requests thực sự (không phải room sharing requests)
       // Dựa vào requestType: 'room_sharing' = room sharing, không có hoặc khác = rental
       const rentalRequests = data.filter(request => {
         const requestType = (request as any).requestType;
         return requestType !== 'room_sharing';
       });
-      
-      console.log('🔍 [DEBUG] Filtered rental requests:', rentalRequests);
-      console.log('🔍 [DEBUG] Filtered length:', rentalRequests.length);
       
       setRequests(rentalRequests);
     } catch (error: any) {
@@ -93,8 +74,6 @@ export default function LandlordRentalRequests() {
       // Thử gọi API riêng trước
       try {
         const sharingData = await getLandlordSharingRequests();
-        console.log('🔍 [DEBUG] Raw data from getLandlordSharingRequests:', sharingData);
-        console.log('🔍 [DEBUG] Sharing data length:', sharingData.length);
         
         if (sharingData.length > 0) {
           // Nếu API riêng có data, augment thêm thông tin phòng
@@ -135,7 +114,7 @@ export default function LandlordRentalRequests() {
           return;
         }
       } catch (error) {
-        console.log('🔍 [DEBUG] getLandlordSharingRequests failed, falling back to getLandlordRentalRequests');
+        // Fallback to rental API
       }
       
       // Fallback: Lấy từ getLandlordRentalRequests và filter
@@ -146,9 +125,6 @@ export default function LandlordRentalRequests() {
         const requestType = (request as any).requestType;
         return requestType === 'room_sharing';
       });
-      
-      console.log('🔍 [DEBUG] Sharing requests from rental API:', sharingRequests);
-      console.log('🔍 [DEBUG] Sharing requests length:', sharingRequests.length);
       
       // Convert LandlordRentalRequest to RoomSharingRequest format
       const convertedSharingRequestsRaw = sharingRequests.map(request => ({

@@ -276,10 +276,6 @@ export default function ChungCuForm({
       delete data.canShare;
       delete data.maxOccupancy;
       delete data.sharePrice;
-      console.log("[ChungCuForm] Submit payload:", {
-        ...data,
-        utilities: normalizedUtilities,
-      });
       onSubmit(data as any);
     } finally {
       setUploading(false);

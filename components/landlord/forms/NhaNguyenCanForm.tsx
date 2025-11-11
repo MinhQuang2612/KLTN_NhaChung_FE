@@ -306,10 +306,6 @@ export default function NhaNguyenCanForm({
       delete payload.maxOccupancy;
       delete payload.sharePrice;
       
-      console.log("[NhaNguyenCanForm] Submit payload:", {
-        ...payload,
-        utilities: normalizedUtilities,
-      });
       onSubmit(payload as any);
     } catch (error) {
     } finally {

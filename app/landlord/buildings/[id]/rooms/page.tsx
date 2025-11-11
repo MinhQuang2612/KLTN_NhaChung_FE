@@ -136,14 +136,6 @@ export default function BuildingRoomsPage() {
       return;
     }
     
-    console.debug("Deleting room", {
-      originalId: id,
-      originalType: typeof id,
-      validId: validRoomId,
-      validType: typeof validRoomId,
-      roomNumber: roomNumber
-    });
-    
     try {
       setConfirmLoading(true);
       await deleteRoom(validRoomId);

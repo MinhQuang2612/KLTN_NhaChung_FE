@@ -149,19 +149,11 @@ export default function BuildingForm({
   };
 
   const commitAddress = () => {
-    console.log('=== COMMIT ADDRESS ===');
-    console.log('addressDraft:', addressDraft);
-    console.log('formData.address before:', formData.address);
-    
     if (addressDraft) {
       setFormData(prev => ({ ...prev, address: addressDraft }));
       if (errors.city || errors.ward) setErrors(prev => ({ ...prev, city: "", ward: "" }));
-      console.log('Address committed successfully');
-    } else {
-      console.log('addressDraft is null, cannot commit');
     }
     setOpenAddressModal(false);
-    console.log('=== COMMIT COMPLETE ===');
   };
 
   const handleMediaChange = (items: LocalMediaItem[]) => {
@@ -317,15 +309,10 @@ export default function BuildingForm({
             <div
               className="relative rounded-2xl border-2 border-gray-300 bg-white px-4 pt-6 pb-3 cursor-pointer transition-colors hover:border-teal-500"
               onClick={() => { 
-                console.log('=== OPENING MODAL ===');
-                console.log('formData.address:', formData.address);
                 const address = formData.address as Address;
-                console.log('Setting addressDraft to:', address);
-                console.log('Current addressModalKey:', addressModalKey);
                 setAddressDraft(address); 
                 setAddressModalKey(prev => prev + 1); 
-                setOpenAddressModal(true); 
-                console.log('=== MODAL OPENED ===');
+                setOpenAddressModal(true);
               }}
               aria-label="Địa chỉ"
             >
@@ -362,7 +349,6 @@ export default function BuildingForm({
             <AddressSelector 
               value={addressDraft} 
               onChange={(newAddress) => {
-                console.log('AddressSelector onChange called with:', newAddress);
                 setAddressDraft(newAddress);
               }} 
             />

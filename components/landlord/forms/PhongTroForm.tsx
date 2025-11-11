@@ -37,12 +37,6 @@ function PhongTroForm({
     setMediaImages([]); // Reset local images - chỉ upload ảnh đang có trong initialData.images
     setMediaVideos([]); // Reset local videos - chỉ upload video đang có trong initialData.videos
   }, [initialData?.images, initialData?.videos]); // Ổn định, không re-mount khi chọn ảnh local
-  
-  // Debug mount
-  useEffect(() => {
-    console.log("PhongTroForm MOUNT");
-    return () => console.log("PhongTroForm UNMOUNT");
-  }, []);
 
   // Kiểm tra form có đầy đủ không
   const isFormValid = () => {
@@ -244,10 +238,6 @@ function PhongTroForm({
       delete payloadAny.maxOccupancy;
       delete payloadAny.sharePrice;
 
-      console.log("[PhongTroForm] Submit payload:", {
-        ...payloadAny,
-        utilities: normalizedUtilities,
-      });
       onSubmit(payloadAny as any);
     } catch (error) {
     } finally {

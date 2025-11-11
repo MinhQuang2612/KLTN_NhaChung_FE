@@ -583,10 +583,11 @@ export default function Testimonials(){
           const currentVote = currentReview?.myVote;
           
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 transform transition-all">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     {currentVote ? (
                       <>
                         <FaSync className="w-5 h-5 text-teal-600" />
@@ -598,17 +599,24 @@ export default function Testimonials(){
                         Vote đánh giá
                       </>
                     )}
-                  </h4>
+                  </h2>
                   <button 
-                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1.5 transition-all" 
-                    onClick={() => { setVoteModalReviewId(null); setVoteChoice(null); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setVoteModalReviewId(null);
+                      setVoteChoice(null);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <FaTimes className="w-5 h-5" />
+                    <span className="text-lg">×</span>
                   </button>
               </div>
               
+                {/* Content */}
+                <div className="p-6 space-y-6">
                 {currentVote && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
                     <FaLightbulb className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-blue-800">
                       Bạn đã vote <span className="font-bold inline-flex items-center gap-1">
@@ -628,7 +636,7 @@ export default function Testimonials(){
                   </div>
                 )}
                 
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                     disabled={currentVote === 'helpful'}
@@ -661,21 +669,21 @@ export default function Testimonials(){
                 </button>
               </div>
                 
-                <div className="flex items-center gap-3">
+                  <div className="flex space-x-3">
                 <button
                   type="button"
-                    className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
                   onClick={() => { setVoteModalReviewId(null); setVoteChoice(null); }}
+                      className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
                   disabled={!user || !voteChoice}
-                    className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+                      className={`flex-1 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       (!user || !voteChoice) 
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                          ? 'bg-gray-200 text-gray-400' 
+                          : 'bg-teal-600 text-white hover:bg-teal-700'
                     }`}
                   onClick={async () => {
                     if (!user || !voteChoice) return;
@@ -702,9 +710,9 @@ export default function Testimonials(){
                     }
                   }}
                 >
-                    <FaCheck className="w-4 h-4" />
                     {currentVote ? 'Thay đổi vote' : 'Gửi vote'}
                 </button>
+                  </div>
               </div>
             </div>
           </div>

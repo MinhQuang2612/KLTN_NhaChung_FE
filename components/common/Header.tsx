@@ -17,8 +17,10 @@ import {
   FaClipboardList,
   FaBuilding,
   FaMoneyBillWave,
-  FaChartBar
+  FaChartBar,
+  FaComments
 } from "react-icons/fa";
+import { useChat } from "../../contexts/ChatContext";
 
 export default function Header() {
   const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
@@ -27,6 +29,7 @@ export default function Header() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
+  const { openModal } = useChat();
   const [selectedCity, setSelectedCity] = useState<string>('TP. Hồ Chí Minh');
 
   // Auto detect current page based on pathname
@@ -248,6 +251,17 @@ export default function Header() {
                     <FaHeart className="text-gray-400 w-4" />
                     <span>Yêu thích</span>
                   </Link>
+
+                  <button
+                    onClick={() => {
+                      openModal();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors w-full text-left"
+                  >
+                    <FaComments className="text-gray-400 w-4" />
+                    <span>Tin nhắn</span>
+                  </button>
 
                   {user.role === 'landlord' && (
                     <>

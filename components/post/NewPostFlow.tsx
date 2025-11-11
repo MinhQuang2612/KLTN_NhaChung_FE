@@ -33,10 +33,6 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
     }
   }, [user?.role]);
 
-  // Debug: Log khi showSuccessModal thay đổi
-  useEffect(() => {
-    console.log('showSuccessModal changed to:', showSuccessModal);
-  }, [showSuccessModal]);
 
   const handleSelectRoom = (room: RoomForPost | null) => {
     setSelectedRoom(room);
@@ -60,10 +56,8 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
   };
 
   const handleSuccess = () => {
-    console.log('handleSuccess called - showing notification modal');
     // Hiển thị modal thông báo ngay lập tức, không chuyển sang step success
     setShowSuccessModal(true);
-    console.log('showSuccessModal set to true immediately');
     // Gọi onSuccess sau một chút để đảm bảo modal đã render
     if (onSuccess) {
       setTimeout(() => {
@@ -255,7 +249,6 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
       )}
 
       {/* Success Notification Modal - Render outside to ensure proper z-index */}
-      {console.log('Rendering NotificationModal, showSuccessModal:', showSuccessModal)}
       <NotificationModal
         isOpen={showSuccessModal}
         onClose={handleSuccessModalClose}

@@ -31,10 +31,6 @@ export async function getRoomById(id: number): Promise<Room> {
 
 // Tạo phòng mới
 export async function createRoom(payload: CreateRoomPayload): Promise<Room> {
-  try {
-    // Log payload thực tế gửi đi để debug
-    console.log("[API] createRoom payload:", payload);
-  } catch {}
   return apiPost("landlord/rooms", payload);
 }
 
