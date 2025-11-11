@@ -262,7 +262,7 @@ function PhongTroForm({
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Media left */}
-          <div className="lg:col-span-1 p-6 space-y-6 border-r border-gray-100 max-h-[70vh] overflow-y-auto pr-2 nice-scrollbar">
+          <div className="lg:col-span-1 p-6 space-y-6 border-r border-gray-100">
             <div>
               <h3 className="text-base font-semibold text-gray-900 mb-3">Ảnh</h3>
               <MediaPickerPanel 
@@ -296,12 +296,23 @@ function PhongTroForm({
                 maxVideos={2}
                 helper={picking ? "Đang tải video..." : "Kéo-thả hoặc bấm để chọn"}
                 onPickingChange={setPicking}
+                extraTop={
+                  form.videos?.length ? (
+                    <div className="mb-3 grid grid-cols-3 gap-3">
+                      {form.videos.map((u, i) => (
+                        <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-black">
+                          <video src={u} className="absolute inset-0 w-full h-full object-cover" controls muted />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null
+                }
               />
             </div>
           </div>
 
           {/* Fields right */}
-          <div className="lg:col-span-2 p-6 space-y-10 max-h-[70vh] overflow-y-auto pr-2 nice-scrollbar">
+          <div className="lg:col-span-2 p-6 space-y-10">
             {/* Thông tin phòng trọ */}
             <section className="space-y-4">
               <h3 className="text-base font-semibold text-gray-900">Thông tin phòng trọ</h3>

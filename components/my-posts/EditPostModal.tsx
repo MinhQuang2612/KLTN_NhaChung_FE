@@ -431,18 +431,32 @@ export default function EditPostModal({ isOpen, onClose, post, onSuccess }: Edit
                   maxImages={12}
                   maxVideos={3}
                   extraTop={
-                    Array.isArray(formData.images) && formData.images.length > 0 ? (
-                      <div className="mb-3">
-                        <div className="text-sm text-gray-600 mb-2">Ảnh hiện có</div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {formData.images.map((src, i) => (
-                            <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-white">
-                              <img src={src} className="absolute inset-0 w-full h-full object-cover" />
-                            </div>
-                          ))}
+                    <>
+                      {Array.isArray(formData.images) && formData.images.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-sm text-gray-600 mb-2">Ảnh hiện có</div>
+                          <div className="grid grid-cols-3 gap-3">
+                            {formData.images.map((src, i) => (
+                              <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-white">
+                                <img src={src} className="absolute inset-0 w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null
+                      )}
+                      {Array.isArray(formData.videos) && formData.videos.length > 0 && (
+                        <div className="mb-3">
+                          <div className="text-sm text-gray-600 mb-2">Video hiện có</div>
+                          <div className="grid grid-cols-3 gap-3">
+                            {formData.videos.map((src, i) => (
+                              <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-black">
+                                <video src={src} className="absolute inset-0 w-full h-full object-cover" controls muted />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   }
                 />
               </div>

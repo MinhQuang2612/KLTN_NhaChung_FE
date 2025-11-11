@@ -98,6 +98,8 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
     const map: Record<string, string> = {
       'co-so-hong': 'Có sổ hồng',
       'cho-so': 'Đang chờ sổ',
+      'dang-ky': 'Đang đăng ký',
+      'chua-dang-ky': 'Chưa đăng ký',
     };
     return map[t] || t;
   };
@@ -312,7 +314,7 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Tình trạng pháp lý:</span>
-                <span className="text-gray-900">{roomData.chungCuInfo.legalStatus || 'Chưa có thông tin'}</span>
+                <span className="text-gray-900">{translateLegalStatus(roomData.chungCuInfo.legalStatus) || 'Chưa có thông tin'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Nội thất:</span>
@@ -363,7 +365,7 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Tình trạng pháp lý:</span>
-                <span className="text-gray-900">{roomData.nhaNguyenCanInfo.legalStatus || 'Chưa có thông tin'}</span>
+                <span className="text-gray-900">{translateLegalStatus(roomData.nhaNguyenCanInfo.legalStatus) || 'Chưa có thông tin'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Tiện ích:</span>

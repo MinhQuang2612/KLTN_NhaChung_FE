@@ -20,6 +20,11 @@ export default function RoomCardVertical({
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden" onClick={() => onClick(roomId)}>
       <div className="relative aspect-video">
         <img src={cover} alt={`Phòng ${room.roomNumber}`} className="w-full h-full object-cover" />
+        {room.status === 'occupied' && (
+          <span className="absolute top-2 left-2 rounded-lg bg-rose-600 text-white text-xs px-2 py-1">
+            Đã thuê
+          </span>
+        )}
         {room.roomNumber && (
           <span className="absolute top-2 right-2 rounded-lg bg-black/70 text-white text-xs px-2 py-1">
             {room.roomNumber}

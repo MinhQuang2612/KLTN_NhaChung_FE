@@ -3,13 +3,14 @@
 import { useState } from "react";
 import ManualInvoiceForm from "@/components/landlord/ManualInvoiceForm";
 import MaintenanceFeePaymentModal from "@/components/landlord/MaintenanceFeePaymentModal";
+import Footer from "@/components/common/Footer";
 
 export default function BillingPage() {
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-10 text-gray-700">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gray-50 text-gray-700">
+      <div className="max-w-5xl mx-auto p-6 md:p-10">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold mb-2">Tính tiền</h1>
@@ -32,6 +33,8 @@ export default function BillingPage() {
         isOpen={showMaintenanceModal}
         onClose={() => setShowMaintenanceModal(false)}
       />
+
+      <Footer />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardCard from "./DashboardCard";
+import Footer from "@/components/common/Footer";
 import { 
   FaClipboardList, 
   FaBuilding, 
@@ -26,7 +27,7 @@ interface MenuItem {
   description: string;
   icon: ReactNode;
   href: string;
-  color: string;
+  color: "teal" | "blue" | "purple" | "orange" | "green" | "pink" | "indigo" | "red";
 }
 
 export default function Dashboard() {
@@ -49,10 +50,10 @@ export default function Dashboard() {
       color: "blue"
     },
     {
-      title: "Quản lý phòng",
-      description: "Xem danh sách và quản lý tất cả các phòng trọ",
-      icon: <FaDoorOpen />,
-      href: "/landlord/rooms",
+      title: "Yêu thích",
+      description: "Xem danh sách phòng và bài đăng bạn đã lưu",
+      icon: <FaHeart />,
+      href: "/favorites",
       color: "purple"
     },
     {
@@ -70,10 +71,10 @@ export default function Dashboard() {
       color: "orange"
     },
     {
-      title: "Quản lý dịch vụ",
-      description: "Quản lý các dịch vụ điện, nước, internet cho tòa nhà",
-      icon: <FaCog />,
-      href: "/landlord/service",
+      title: "Đăng tin cho thuê",
+      description: "Tạo bài đăng cho thuê phòng, căn hộ nhanh chóng",
+      icon: <FaPen />,
+      href: "/post",
       color: "indigo"
     },
     {
@@ -190,26 +191,26 @@ export default function Dashboard() {
   const roleLabel = user.role === 'landlord' ? 'Chủ nhà' : 'Người thuê';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50">
+    <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="mb-12 text-center">
-          <div className="inline-block mb-4 px-4 py-2 bg-teal-100 text-teal-700 rounded-full text-sm font-medium">
+          <div className="inline-block mb-4 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700">
             {roleLabel}
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Xin chào, <span className="text-teal-600">{user.name}</span>! 👋
           </h1>
           <p className="text-gray-600 text-lg">
-            Chọn chức năng bạn muốn truy cập bên dưới
+            Chọn chức năng chính bạn muốn truy cập bên dưới
           </p>
         </div>
 
         {/* Menu Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {menuItems.map((item) => (
             <DashboardCard
-              key={item.href}
+              key={item.title}
               title={item.title}
               description={item.description}
               icon={item.icon}
@@ -228,6 +229,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

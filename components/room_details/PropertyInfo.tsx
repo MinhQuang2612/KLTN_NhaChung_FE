@@ -58,8 +58,28 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
     fetchRating();
   }, [postData?.postId]);
   
-  // Extract images từ roomData (preferred) or postData
-  const images = (roomData?.images?.length > 0 ? roomData.images : ((postData?.images?.length ?? 0) > 0 ? postData?.images : ["/home/room1.png"]));
+  // Helper nhận diện URL video đơn giản
+  const isVideoUrl = (url: string) => {
+    const lower = (url || "").toLowerCase();
+    return (
+      lower.endsWith(".mp4") ||
+      lower.endsWith(".webm") ||
+      lower.endsWith(".ogg") ||
+      lower.includes("/video/")
+    );
+  };
+
+  // Gom media (ảnh + video). Ưu tiên roomData, fallback postData, cuối cùng ảnh mặc định
+  const roomImages: string[] = Array.isArray(roomData?.images) ? roomData.images : [];
+  const roomVideos: string[] = Array.isArray(roomData?.videos) ? roomData.videos : [];
+  const postImages: string[] = Array.isArray(postData?.images) ? (postData?.images as any) : [];
+  const postVideos: string[] = Array.isArray((postData as any)?.videos) ? ((postData as any).videos as any) : [];
+  const media: string[] =
+    (roomImages.length || roomVideos.length)
+      ? [...roomImages, ...roomVideos]
+      : ((postImages.length || postVideos.length)
+          ? [...postImages, ...postVideos]
+          : ["/home/room1.png"]);
 
   // Get post ID và check favorite status
   const postId = postData?.postId;
@@ -74,11 +94,11 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
   };
 
   const nextImage = () => {
-    setCurrentImage((prev) => (prev + 1) % images.length);
+    setCurrentImage((prev) => (prev + 1) % media.length);
   };
 
   const prevImage = () => {
-    setCurrentImage((prev) => (prev - 1 + images.length) % images.length);
+    setCurrentImage((prev) => (prev - 1 + media.length) % media.length);
   };
 
   const handleThumbnailClick = (index: number) => {
@@ -87,13 +107,21 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      {/* Image Gallery Section */}
+      {/* Media Gallery Section */}
       <div className="space-y-4 mb-6">
-        {/* Main Image (object-cover với fallback, nền mờ, điều hướng, đếm trang) */}
+        {/* Main Media (ảnh hoặc video) */}
         <div className="relative bg-gray-100 rounded-xl overflow-hidden">
           <div className="w-full h-[420px] md:h-[500px] relative">
+            {isVideoUrl(media[currentImage]) ? (
+              <video
+                src={media[currentImage]}
+                className="w-full h-full object-cover bg-black"
+                controls
+                playsInline
+              />
+            ) : (
             <img
-              src={images[currentImage]}
+                src={media[currentImage]}
               alt="Phòng trọ"
               className="w-full h-full object-cover"
               loading="lazy"
@@ -104,12 +132,13 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
                 target.style.objectPosition = 'center';
               }}
             />
+            )}
             {/* Overlay để đảm bảo text đọc được */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
           </div>
           <div
             className="pointer-events-none absolute inset-0 -z-10 bg-center bg-cover scale-110 blur-md opacity-40"
-            style={{ backgroundImage: `url(${images[currentImage]})` }}
+            style={{ backgroundImage: isVideoUrl(media[currentImage]) ? undefined : `url(${media[currentImage]})` }}
             aria-hidden="true"
           />
 
@@ -136,13 +165,13 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
 
           {/* Counter bottom-right */}
           <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-            {currentImage + 1}/{images.length}
+            {currentImage + 1}/{media.length}
           </div>
         </div>
 
         {/* Thumbnails (scroll ngang) */}
         <div className="flex gap-3 overflow-x-auto pb-1">
-          {images.map((image: string, index: number) => (
+          {media.map((url: string, index: number) => (
             <button
               key={index}
               onClick={() => handleThumbnailClick(index)}
@@ -153,7 +182,18 @@ export default function PropertyInfo({ postData, postType }: PropertyInfoProps) 
               }`}
               aria-label={`Xem ảnh ${index + 1}`}
             >
-              <img src={image} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+              {isVideoUrl(url) ? (
+                <div className="w-full h-full bg-black relative">
+                  <video src={url} className="w-full h-full object-cover opacity-80" muted />
+                  <div className="absolute inset-0 grid place-items-center">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/70 text-white">
+                      ▶
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <img src={url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+              )}
             </button>
           ))}
         </div>

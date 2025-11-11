@@ -34,7 +34,7 @@ interface FavoritesContentProps {
 
 export default function FavoritesContent({ favorites, onContact, onView, onRemove }: FavoritesContentProps) {
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("newest");
+  const [sortBy, setSortBy] = useState<string>("none");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -45,6 +45,7 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
   }, [favorites, filterCategory]);
 
   const sortedFavorites = useMemo(() => {
+    if (sortBy === "none") return filteredFavorites;
     return [...filteredFavorites].sort((a, b) => {
       switch (sortBy) {
         case "newest":
@@ -134,20 +135,7 @@ export default function FavoritesContent({ favorites, onContact, onView, onRemov
               </div>
             </div>
 
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700">Sắp xếp:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white"
-              >
-                <option value="newest">Mới nhất</option>
-                <option value="oldest">Cũ nhất</option>
-                <option value="price-low">Giá thấp → cao</option>
-                <option value="price-high">Giá cao → thấp</option>
-              </select>
-            </div>
+            {/* Sort removed per request */}
           </div>
         </div>
 

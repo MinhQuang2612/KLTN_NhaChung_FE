@@ -117,6 +117,30 @@ export default function NhaNguyenCanForm({
     ...initialData
   });
 
+  // Đồng bộ các trường bedrooms/bathrooms/direction/legalStatus từ nhaNguyenCanInfo của BE về root (khi edit)
+  useEffect(() => {
+    const nested = (initialData as any)?.nhaNguyenCanInfo;
+    if (!nested) return;
+    const hasAnyNested =
+      nested.bedrooms !== undefined ||
+      nested.bathrooms !== undefined ||
+      nested.direction !== undefined ||
+      nested.legalStatus !== undefined;
+    if (!hasAnyNested) return;
+    setForm((p) => ({
+      ...p,
+      bedrooms: nested.bedrooms ?? p.bedrooms,
+      bathrooms: nested.bathrooms ?? p.bathrooms,
+      direction: nested.direction ?? p.direction,
+      legalStatus: nested.legalStatus ?? p.legalStatus,
+    }));
+    setNums((prev) => ({
+      ...prev,
+      bedrooms: numberToDisplay(nested.bedrooms ?? form.bedrooms) || String(nested.bedrooms ?? form.bedrooms ?? ""),
+      bathrooms: numberToDisplay(nested.bathrooms ?? form.bathrooms) || String(nested.bathrooms ?? form.bathrooms ?? ""),
+    }));
+  }, [initialData?.nhaNguyenCanInfo]);
+
   // Đồng bộ parkingFee từ BE vào field hiển thị
   useEffect(() => {
     const beParkingFee = (initialData as any)?.utilities?.parkingFee;
@@ -330,7 +354,7 @@ export default function NhaNguyenCanForm({
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Media left */}
-          <div className="lg:col-span-1 p-6 space-y-6 border-r border-gray-100 max-h-[70vh] overflow-y-auto pr-2 nice-scrollbar">
+          <div className="lg:col-span-1 p-6 space-y-6 border-r border-gray-100">
             <div>
               <h3 className="text-base font-semibold text-gray-900 mb-3">Ảnh</h3>
               <MediaPickerPanel mediaItems={mediaImages} onMediaChange={setMediaImages} maxImages={12} maxVideos={0} extraTop={
@@ -347,12 +371,30 @@ export default function NhaNguyenCanForm({
             </div>
             <div>
               <h3 className="text-base font-semibold text-gray-900 mb-3">Video</h3>
-              <MediaPickerPanel accept="video/*" pillText="Video hợp lệ" mediaItems={mediaVideos} onMediaChange={setMediaVideos} maxImages={2} maxVideos={2} />
+              <MediaPickerPanel 
+                accept="video/*" 
+                pillText="Video hợp lệ" 
+                mediaItems={mediaVideos} 
+                onMediaChange={setMediaVideos} 
+                maxImages={2} 
+                maxVideos={2}
+                extraTop={
+                  form.videos?.length ? (
+                    <div className="mb-3 grid grid-cols-3 gap-3">
+                      {form.videos.map((u, i) => (
+                        <div key={i} className="relative pb-[133%] rounded-2xl overflow-hidden border bg-black">
+                          <video src={u} className="absolute inset-0 w-full h-full object-cover" controls muted />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null
+                }
+              />
             </div>
           </div>
 
           {/* Fields right */}
-          <div className="lg:col-span-2 p-6 space-y-10 max-h-[70vh] overflow-y-auto pr-2 nice-scrollbar">
+          <div className="lg:col-span-2 p-6 space-y-10">
             {/* Thông tin nhà nguyên căn */}
             <section className="space-y-4">
               <h3 className="text-base font-semibold text-gray-900">Thông tin nhà nguyên căn</h3>

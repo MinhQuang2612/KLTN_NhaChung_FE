@@ -142,3 +142,35 @@ export interface UserRoom {
 export async function getUserRooms(): Promise<UserRoom[]> {
   return apiGet("users/rooms");
 }
+
+// Lấy thông tin người thuê hiện tại của phòng (dành cho landlord)
+export interface CurrentTenantInfo {
+  roomId: number;
+  contractId: number;
+  contractStatus: 'active' | 'expired';
+  tenant: {
+    userId: number;
+    fullName: string;
+    phone: string;
+    email: string;
+    avatarUrl?: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  monthlyRent: number;
+  deposit: number;
+}
+
+export async function getRoomTenant(roomId: number): Promise<CurrentTenantInfo | null> {
+  try {
+    const res = await apiGet<CurrentTenantInfo>(`landlord/rooms/${roomId}/tenant`);
+    return res;
+  } catch (e: any) {
+    // Trường hợp 204 No Content, apiGet có thể ném lỗi hoặc trả undefined tùy implement
+    // Chuẩn hóa: nếu status 204 hoặc message tương ứng, trả null để FE hiển thị thông báo phù hợp
+    if (e?.status === 204) return null;
+    throw e;
+  }
+}

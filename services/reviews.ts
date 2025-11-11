@@ -13,6 +13,9 @@ export interface Reply {
   createdAt: string;
   updatedAt?: string;
   isEdited: boolean;
+  votesHelpful?: number;
+  votesUnhelpful?: number;
+  myVote?: 'helpful' | 'unhelpful' | null;
 }
 
 export interface Review {
@@ -165,3 +168,13 @@ export function deleteReply(reviewId: number, replyId: number, userId: number) {
   return apiDel<DeleteReplyResponse>(`${BASE}/${reviewId}/replies/${replyId}?userId=${userId}`);
 }
 
+export function voteReply(reviewId: number, replyId: number, userId: number, isHelpful: boolean) {
+  // POST /reviews/{reviewId}/replies/{replyId}/vote?userId=xxx
+  return apiPost<{
+    reviewId: number;
+    replyId: number;
+    votesHelpful: number;
+    votesUnhelpful: number;
+    myVote: 'helpful' | 'unhelpful';
+  }>(`${BASE}/${reviewId}/replies/${replyId}/vote?userId=${userId}`, { isHelpful });
+}

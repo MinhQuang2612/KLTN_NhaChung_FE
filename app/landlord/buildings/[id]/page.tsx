@@ -11,7 +11,7 @@ import ChungCuForm from "@/components/landlord/forms/ChungCuForm";
 import NotificationModal from "@/components/common/NotificationModal";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { getBuildingById } from "@/services/buildings";
-import { getRooms, createRoom, deleteRoom, softDeleteRoom } from "@/services/rooms";
+import { getRooms, createRoom, deleteRoom, softDeleteRoom, getRoomTenant } from "@/services/rooms";
 import { getPostsByRoom, deletePost } from "@/services/posts";
 import { Building } from "@/types/Building";
 import { Room, CreateRoomPayload, RoomListParams } from "@/types/Room";
@@ -31,7 +31,21 @@ export default function BuildingDetailsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [showTenantModal, setShowTenantModal] = useState(false);
+  const [tenantLoading, setTenantLoading] = useState(false);
   const [layout, setLayout] = useState<"vertical" | "horizontal">("vertical");
+
+  const translateContractStatus = (s?: string) => {
+    if (!s) return '';
+    const map: Record<string, string> = {
+      active: 'Đang hiệu lực',
+      expired: 'Hết hạn',
+      pending: 'Chờ hiệu lực',
+      cancelled: 'Đã hủy',
+    };
+    return map[s] || s;
+  };
 
   const loadData = async () => {
     try {
@@ -115,6 +129,32 @@ export default function BuildingDetailsPage() {
 
   const handleEdit = (roomId: number) => router.push(`/landlord/rooms/${roomId}/edit`);
   const handleView = (roomId: number) => router.push(`/landlord/rooms/${roomId}`);
+
+  const handleCardClick = async (roomId: number) => {
+    const r = rooms.find((x) => (((x as any).roomId || x.id) === roomId));
+    if (r?.status === 'occupied') {
+      try {
+        setTenantLoading(true);
+        const info = await getRoomTenant(roomId);
+        if (info) {
+          setTenantInfo(info);
+          setShowTenantModal(true);
+        } else {
+          // Không có người thuê active: mở modal với trạng thái rỗng
+          setTenantInfo(null);
+          setShowTenantModal(true);
+        }
+      } catch (e: any) {
+        showError("Không thể tải thông tin người thuê", e?.message || "Vui lòng thử lại");
+      } finally {
+        setTenantLoading(false);
+      }
+    } else {
+      // Phòng chưa thuê: cũng mở modal thông báo
+      setTenantInfo(null);
+      setShowTenantModal(true);
+    }
+  };
   const handleDelete = (roomId: number) => {
     // Tìm room để lấy roomNumber
     const roomToDelete = rooms.find(room => {
@@ -309,7 +349,7 @@ export default function BuildingDetailsPage() {
                     <RoomCardVertical
                       key={`${room?.id ?? 'no-id'}-${room?.roomNumber ?? 'no-num'}-${idx}`}
                       room={room}
-                      onClick={handleView}
+                      onClick={handleCardClick}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />
@@ -317,7 +357,7 @@ export default function BuildingDetailsPage() {
                     <RoomCardHorizontal
                       key={`${room?.id ?? 'no-id'}-${room?.roomNumber ?? 'no-num'}-${idx}`}
                       room={room}
-                      onClick={handleView}
+                      onClick={handleCardClick}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />
@@ -366,6 +406,84 @@ export default function BuildingDetailsPage() {
       )}
 
       <Footer />
+
+      {/* Tenant Info Modal */}
+      {showTenantModal && (
+        <div className="fixed inset-0 z-[110]">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowTenantModal(false)} />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Thông tin người thuê</h3>
+                <button onClick={() => setShowTenantModal(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 grid place-items-center text-gray-500">×</button>
+              </div>
+              <div className="px-6 py-5">
+                {tenantLoading ? (
+                  <div className="py-10 text-center text-gray-500">Đang tải...</div>
+                ) : tenantInfo ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      {tenantInfo?.tenant?.avatarUrl ? (
+                        <img src={tenantInfo.tenant.avatarUrl} className="w-12 h-12 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gray-200 grid place-items-center text-gray-500">👤</div>
+                      )}
+                      <div>
+                        <div className="text-base font-semibold text-gray-900">{tenantInfo?.tenant?.fullName || '—'}</div>
+                        <div className="text-sm text-gray-600">{tenantInfo?.tenant?.email || '—'}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-500">Số điện thoại</div>
+                        <div className="text-gray-900">{tenantInfo?.tenant?.phone || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Trạng thái HĐ</div>
+                        <div className="text-gray-900">{translateContractStatus(tenantInfo?.contractStatus) || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Thời hạn</div>
+                        <div className="text-gray-900">
+                          {tenantInfo?.period?.startDate ? new Date(tenantInfo.period.startDate).toLocaleDateString('vi-VN') : '—'} 
+                          {" - "}
+                          {tenantInfo?.period?.endDate ? new Date(tenantInfo.period.endDate).toLocaleDateString('vi-VN') : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Giá thuê</div>
+                        <div className="text-gray-900">{new Intl.NumberFormat('vi-VN').format(tenantInfo?.monthlyRent || 0)} đ/tháng</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Đặt cọc</div>
+                        <div className="text-gray-900">{new Intl.NumberFormat('vi-VN').format(tenantInfo?.deposit || 0)} đ</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-10 text-center text-gray-500">Không có dữ liệu người thuê.</div>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+                <div className="flex items-center justify-between w-full">
+                  <button
+                    onClick={() => {
+                      if (tenantInfo?.contractId) {
+                        router.push(`/landlord/billing?contractId=${tenantInfo.contractId}`);
+                      }
+                    }}
+                    disabled={!tenantInfo?.contractId}
+                    className="px-4 py-2 rounded-lg border border-teal-300 text-teal-700 hover:bg-teal-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Tính tiền
+                  </button>
+                  <button onClick={() => setShowTenantModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">Đóng</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Notification Modal */}
       <NotificationModal

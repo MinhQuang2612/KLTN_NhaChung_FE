@@ -119,7 +119,9 @@ export type CreateRoomPayload = {
   description: string;
 };
 
-export type UpdateRoomPayload = Partial<CreateRoomPayload>;
+export type UpdateRoomPayload = Partial<CreateRoomPayload> & {
+  status?: 'available' | 'occupied' | 'maintenance';
+};
 
 export type SoftDeletePayload = {
   isActive: boolean;

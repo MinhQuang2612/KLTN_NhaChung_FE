@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createManualInvoice, CreateManualInvoicePayload } from "@/services/landlordInvoices";
 import { useToast } from "@/contexts/ToastContext";
 import { extractApiErrorMessage } from "@/utils/api";
 import { getLandlordContracts, getLandlordContractById, LandlordContractSummary } from "@/services/rentalRequests";
+import { getRoomById } from "@/services/rooms";
 
 interface OtherItemInput {
   description: string;
@@ -14,14 +16,16 @@ interface OtherItemInput {
 
 export default function ManualInvoiceForm() {
   const { showSuccess, showError } = useToast();
+  const searchParams = useSearchParams();
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [contracts, setContracts] = useState<LandlordContractSummary[]>([]);
-  const [contractSearch, setContractSearch] = useState("");
+  const [roomIdToCategory, setRoomIdToCategory] = useState<Record<number, string>>({});
   const [validatingContract, setValidatingContract] = useState(false);
   const [validatedContract, setValidatedContract] = useState<any>(null);
+  const [contractLocked, setContractLocked] = useState(false);
 
   const [form, setForm] = useState({
     contractId: "",
@@ -44,11 +48,43 @@ export default function ManualInvoiceForm() {
     loadContracts();
   }, []);
 
+  // Prefill contractId nếu có trên URL (?contractId=...)
+  useEffect(() => {
+    const id = searchParams?.get("contractId");
+    if (id) {
+      setForm((p) => ({ ...p, contractId: id }));
+      setContractLocked(true);
+    }
+  }, [searchParams]);
+
+  // Gợi ý hạn thanh toán: mặc định là cuối tháng hiện tại nếu chưa chọn
+  useEffect(() => {
+    if (!form.dueDate) {
+      const now = new Date();
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const iso = lastDay.toISOString().slice(0, 10);
+      setForm((p) => ({ ...p, dueDate: iso }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadContracts = async () => {
     try {
       setLoadingContracts(true);
       const data = await getLandlordContracts();
-      setContracts(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setContracts(list);
+
+      // Nạp category phòng để hiển thị trong option
+      const uniqueRoomIds = Array.from(new Set(list.map((c) => c.roomId).filter(Boolean)));
+      const catMap: Record<number, string> = {};
+      await Promise.all(uniqueRoomIds.map(async (rid) => {
+        try {
+          const room = await getRoomById(Number(rid));
+          catMap[Number(rid)] = (room as any)?.category || "";
+        } catch {}
+      }));
+      setRoomIdToCategory(catMap);
     } catch (e: any) {
       // Không chặn form nếu lỗi; chỉ thông báo nhẹ
       showError("Không thể tải danh sách hợp đồng", extractApiErrorMessage(e));
@@ -59,18 +95,42 @@ export default function ManualInvoiceForm() {
 
   const filteredContracts = useMemo(() => {
     // Chỉ hiển thị hợp đồng loại single theo yêu cầu
-    const onlySingle = contracts.filter((c) => (c.contractType ?? 'single') === 'single');
-    if (!contractSearch) return onlySingle;
-    const q = contractSearch.toLowerCase();
-    return onlySingle.filter((c: LandlordContractSummary) => {
-      const parts = [
-        c.contractId,
-        c?.roomInfo?.roomNumber,
-        c?.status,
-      ].filter(Boolean).map(String);
-      return parts.some((p: string) => p.toLowerCase().includes(q));
-    });
-  }, [contracts, contractSearch]);
+    return contracts.filter((c) => (c.contractType ?? 'single') === 'single');
+  }, [contracts]);
+
+  const translateCategory = (cat?: string) => {
+    if (!cat) return "";
+    const map: Record<string, string> = {
+      "phong-tro": "Phòng trọ",
+      "chung-cu": "Chung cư",
+      "nha-nguyen-can": "Nhà nguyên căn",
+    };
+    return map[cat] || cat;
+  };
+
+  const translateContractStatus = (s?: string) => {
+    if (!s) return "";
+    const map: Record<string, string> = {
+      active: "Đang hiệu lực",
+      terminated: "Đã kết thúc",
+      expired: "Hết hạn",
+      cancelled: "Đã hủy",
+      pending: "Chờ hiệu lực",
+    };
+    return map[s] || s;
+  };
+
+  const translateInvoiceStatus = (s?: string) => {
+    if (!s) return "";
+    const map: Record<string, string> = {
+      pending: "Chờ thanh toán",
+      paid: "Đã thanh toán",
+      overdue: "Quá hạn",
+      cancelled: "Đã hủy",
+      draft: "Nháp",
+    };
+    return map[s] || s;
+  };
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
@@ -189,47 +249,36 @@ export default function ManualInvoiceForm() {
       <h2 className="text-xl font-semibold mb-4">Tạo hoá đơn thủ công</h2>
 
       <form onSubmit={handleSubmit} className="space-y-6 bg-white border rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Chọn hợp đồng</label>
-            <div className="flex gap-2">
-              <input
-                value={contractSearch}
-                onChange={(e) => setContractSearch(e.target.value)}
-                placeholder="Tìm theo mã hợp đồng, số phòng, trạng thái"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <button type="button" onClick={loadContracts} className="px-3 py-2 border rounded-lg bg-white hover:bg-gray-50 text-sm" disabled={loadingContracts}>
-                {loadingContracts ? "Đang tải" : "Tải lại"}
-              </button>
-            </div>
-            <div className="mt-2">
-              <select
-                className="w-full border rounded-lg px-3 py-2"
-                value={form.contractId}
-                onChange={(e) => setForm((prev) => ({ ...prev, contractId: e.target.value }))}
-              >
-                <option value="">-- Chọn hợp đồng --</option>
-                {filteredContracts.map((c: LandlordContractSummary) => (
-                  <option key={c.contractId} value={String(c.contractId)}>
-                    #{c.contractId} - Phòng {c?.roomInfo?.roomNumber ?? "?"} - {c?.status ?? ""} (single)
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Bạn vẫn có thể nhập tay bên cạnh nếu cần.</p>
-          </div>
+        <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hoặc nhập Contract ID</label>
-            <input name="contractId" value={form.contractId} onChange={onChange} placeholder="VD: 123" className="w-full border rounded-lg px-3 py-2" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chọn hợp đồng</label>
+            <select
+              className="w-full border rounded-lg px-3 py-2"
+              value={form.contractId}
+              onChange={(e) => setForm((prev) => ({ ...prev, contractId: e.target.value }))}
+            >
+              <option value="">-- Chọn hợp đồng --</option>
+              {filteredContracts.map((c: LandlordContractSummary) => {
+                const cat = translateCategory(roomIdToCategory[c.roomId]);
+                const label = `Phòng ${c?.roomInfo?.roomNumber ?? "?"}${cat ? " - " + cat : ""} (${translateContractStatus(c?.status)})`;
+                return (
+                  <option key={c.contractId} value={String(c.contractId)}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              (Danh sách lấy từ hợp đồng của bạn. Nếu không thấy, bấm refresh trình duyệt để tải lại.)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tháng</label>
-            <input name="month" value={form.month} onChange={onChange} className="w-full border rounded-lg px-3 py-2" />
+            <input name="month" value={form.month} onChange={onChange} className="w-full border rounded-lg px-3 py-2" inputMode="numeric" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Năm</label>
-            <input name="year" value={form.year} onChange={onChange} className="w-full border rounded-lg px-3 py-2" />
+            <input name="year" value={form.year} onChange={onChange} className="w-full border rounded-lg px-3 py-2" inputMode="numeric" />
           </div>
         </div>
 
@@ -247,17 +296,19 @@ export default function ManualInvoiceForm() {
         <div>
           <h3 className="font-medium text-gray-900 mb-2">Điện</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input placeholder="Chỉ số đầu" name="electricityStart" value={form.electricityStart} onChange={onChange} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Chỉ số cuối" name="electricityEnd" value={form.electricityEnd} onChange={onChange} className="border rounded-lg px-3 py-2" />
+            <input placeholder="Chỉ số đầu" name="electricityStart" value={form.electricityStart} onChange={onChange} className="border rounded-lg px-3 py-2" type="number" min="0" />
+            <input placeholder="Chỉ số cuối" name="electricityEnd" value={form.electricityEnd} onChange={onChange} className="border rounded-lg px-3 py-2" type="number" min="0" />
           </div>
+          <p className="text-xs text-gray-500 mt-1">Để trống nếu không tính điện trong kỳ này.</p>
         </div>
 
         <div>
           <h3 className="font-medium text-gray-900 mb-2">Nước</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input placeholder="Chỉ số đầu" name="waterStart" value={form.waterStart} onChange={onChange} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Chỉ số cuối" name="waterEnd" value={form.waterEnd} onChange={onChange} className="border rounded-lg px-3 py-2" />
+            <input placeholder="Chỉ số đầu" name="waterStart" value={form.waterStart} onChange={onChange} className="border rounded-lg px-3 py-2" type="number" min="0" />
+            <input placeholder="Chỉ số cuối" name="waterEnd" value={form.waterEnd} onChange={onChange} className="border rounded-lg px-3 py-2" type="number" min="0" />
           </div>
+          <p className="text-xs text-gray-500 mt-1">Để trống nếu không tính nước trong kỳ này.</p>
         </div>
 
         <div>
@@ -272,7 +323,7 @@ export default function ManualInvoiceForm() {
               {otherItems.map((it, idx) => (
                 <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                   <input className="md:col-span-6 border rounded-lg px-3 py-2" placeholder="Mô tả" value={it.description} onChange={(e) => changeOtherItem(idx, "description", e.target.value)} />
-                  <input className="md:col-span-3 border rounded-lg px-3 py-2" placeholder="Số tiền" value={it.amount} onChange={(e) => changeOtherItem(idx, "amount", e.target.value)} />
+                  <input className="md:col-span-3 border rounded-lg px-3 py-2" placeholder="Số tiền" value={it.amount} onChange={(e) => changeOtherItem(idx, "amount", e.target.value)} inputMode="numeric" />
                   <input className="md:col-span-2 border rounded-lg px-3 py-2" placeholder="Loại (vd: internet)" value={it.type} onChange={(e) => changeOtherItem(idx, "type", e.target.value)} />
                   <button type="button" onClick={() => removeOtherItem(idx)} className="md:col-span-1 text-red-600 text-sm">Xóa</button>
                 </div>
@@ -300,7 +351,7 @@ export default function ManualInvoiceForm() {
             <div>Mã hoá đơn: <span className="font-semibold">#{result.invoiceId}</span></div>
             <div>Tổng tiền: <span className="font-semibold">{new Intl.NumberFormat('vi-VN').format(result.amount)} đ</span></div>
             <div>Hạn thanh toán: {new Date(result.dueDate).toLocaleString('vi-VN')}</div>
-            <div>Trạng thái: {result.status}</div>
+            <div>Trạng thái: {translateInvoiceStatus(result.status)}</div>
             {result.description ? <div>Mô tả: {result.description}</div> : null}
           </div>
           {Array.isArray(result.items) && result.items.length > 0 && (
