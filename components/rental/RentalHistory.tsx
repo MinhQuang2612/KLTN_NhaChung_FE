@@ -6,6 +6,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { extractApiErrorMessage } from "@/utils/api";
 import { FaBuilding, FaDoorOpen, FaCalendarAlt, FaMoneyBillWave, FaInfoCircle } from "react-icons/fa";
 import Link from "next/link";
+import { getPostById } from "@/services/posts";
 
 interface RentalHistoryProps {
   onCountChange?: (count: number) => void;
@@ -17,6 +18,7 @@ export default function RentalHistory({ onCountChange }: RentalHistoryProps) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [postTypes, setPostTypes] = useState<Record<number, 'rent' | 'roommate' | null>>({}); // Cache postType của các activePostId
   const { showError } = useToast();
 
   useEffect(() => {
@@ -36,6 +38,9 @@ export default function RentalHistory({ onCountChange }: RentalHistoryProps) {
       if (onCountChange) {
         onCountChange(total);
       }
+
+      // Kiểm tra postType của các activePostId
+      await checkPostTypes(response.history || []);
     } catch (error: any) {
       // Nếu lỗi 400 "User not found" - có thể do API chưa implement
       // Chỉ set history = [] và không show error toast để tránh làm phiền user
@@ -53,6 +58,52 @@ export default function RentalHistory({ onCountChange }: RentalHistoryProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Kiểm tra postType của các bài đăng active
+  const checkPostTypes = async (historyItems: RentalHistoryItem[]) => {
+    const postTypeMap: Record<number, 'rent' | 'roommate' | null> = {};
+    
+    // Lấy danh sách postId cần kiểm tra (loại bỏ trùng lặp)
+    const uniquePostIds = Array.from(new Set(
+      historyItems
+        .filter(item => item.activePostId)
+        .map(item => item.activePostId!)
+    ));
+
+    // Chỉ kiểm tra các postId chưa có trong cache
+    const postIdsToCheck = uniquePostIds.filter(postId => !(postId in postTypes));
+
+    if (postIdsToCheck.length === 0) {
+      return;
+    }
+
+    // Gọi API song song để lấy postType
+    const promises = postIdsToCheck.map(postId =>
+      getPostById(postId)
+        .then((post) => {
+          postTypeMap[postId] = post.postType || 'rent';
+        })
+        .catch(() => {
+          // Nếu lỗi, mặc định là null (không hiển thị nút)
+          postTypeMap[postId] = null;
+        })
+    );
+
+    await Promise.all(promises);
+    
+    // Cập nhật cache với các postType mới (giữ lại các postType cũ)
+    setPostTypes(prev => ({ ...prev, ...postTypeMap }));
+  };
+
+  // Kiểm tra có nên hiển thị nút "Thuê lại" không
+  // Chỉ hiển thị nếu postType là 'rent'
+  const shouldShowRentAgainButton = (item: RentalHistoryItem): boolean => {
+    if (!item.activePostId) {
+      return false;
+    }
+    const postType = postTypes[item.activePostId];
+    return postType === 'rent';
   };
 
   if (loading) {
@@ -200,7 +251,7 @@ export default function RentalHistory({ onCountChange }: RentalHistoryProps) {
               </div>
 
               {/* Action Button - Thuê lại */}
-              {item.activePostId ? (
+              {shouldShowRentAgainButton(item) ? (
                 <Link 
                   href={`/room_details/${item.activePostId}`}
                   className="block w-full text-center bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white py-2.5 px-4 rounded-lg transition-all duration-300 font-medium shadow-md hover:shadow-lg"

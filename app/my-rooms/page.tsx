@@ -12,6 +12,16 @@ import { extractApiErrorMessage } from '@/utils/api';
 import { uploadFiles } from '@/utils/upload';
 import RentalHistory from '@/components/rental/RentalHistory';
 import TerminateContractModal from '@/components/rental/TerminateContractModal';
+import RoomSharingToggle from '@/components/roommate/RoomSharingToggle';
+import RoommateRequirementsModal from '@/components/roommate/RoommateRequirementsModal';
+import {
+  getRoommatePreference,
+  updateRoommatePreference,
+  RoommatePreference,
+} from '@/services/roommatePreferences';
+import { Requirements } from '@/types/Post';
+import { useRouter } from 'next/navigation';
+import { getMyProfile } from '@/services/userProfiles';
 
 const MyRoomsPage = () => {
   const { user, isLoading } = useAuth();
@@ -35,13 +45,43 @@ const MyRoomsPage = () => {
   const [landlordUploaderVersionMap, setLandlordUploaderVersionMap] = useState<Record<number, number>>({});
   const [reviewTargetMap, setReviewTargetMap] = useState<Record<number, 'ROOM' | 'USER'>>({});
   const { showError, showSuccess } = useToast();
+  const router = useRouter();
+
+  // Roommate preferences state
+  const [roommatePreferences, setRoommatePreferences] = useState<Record<number, RoommatePreference>>({});
+  const [profile, setProfile] = useState<any>(null); // ⭐ Profile để lấy posterTraits
+  const [showRequirementsModal, setShowRequirementsModal] = useState(false);
+  const [currentRoomId, setCurrentRoomId] = useState<number | null>(null);
+  const [loadingPreferences, setLoadingPreferences] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (!isLoading && user) {
       loadMyRooms();
       loadHistoryCount();
+      loadProfile(); // ⭐ Load profile để lấy posterTraits
     }
   }, [user, isLoading]);
+
+  // Load profile để lấy posterTraits
+  const loadProfile = async () => {
+    try {
+      const profileData = await getMyProfile();
+      setProfile(profileData);
+    } catch (error) {
+      // Nếu không có profile, không sao
+    }
+  };
+
+  // Load roommate preferences for each room
+  useEffect(() => {
+    if (rooms.length > 0) {
+      rooms.forEach((room) => {
+        if (room.contractStatus === 'active') {
+          loadRoommatePreference(room.roomId);
+        }
+      });
+    }
+  }, [rooms]);
 
   const loadHistoryCount = async () => {
     try {
@@ -77,6 +117,72 @@ const MyRoomsPage = () => {
       setLoading(false);
     }
   };
+
+  const loadRoommatePreference = async (roomId: number) => {
+    try {
+      setLoadingPreferences((prev) => ({ ...prev, [roomId]: true }));
+      const preference = await getRoommatePreference(roomId);
+      setRoommatePreferences((prev) => ({ ...prev, [roomId]: preference }));
+    } catch (error) {
+      // Nếu lỗi, set preference mặc định
+      setRoommatePreferences((prev) => ({
+        ...prev,
+        [roomId]: {
+          enabled: false,
+          postId: null,
+          postStatus: null,
+          requirements: null,
+        },
+      }));
+    } finally {
+      setLoadingPreferences((prev) => ({ ...prev, [roomId]: false }));
+    }
+  };
+
+
+  const handleToggleRoommatePreference = async (roomId: number, enabled: boolean) => {
+    if (enabled) {
+      // Bật toggle → Mở modal cấu hình yêu cầu
+      setCurrentRoomId(roomId);
+      setShowRequirementsModal(true);
+    } else {
+      // Tắt toggle → Ẩn bài đăng
+      try {
+        await updateRoommatePreference(roomId, { enabled: false });
+        await loadRoommatePreference(roomId);
+        showSuccess('Đã tắt tìm người ở ghép', 'Bài đăng đã được ẩn.');
+      } catch (error: any) {
+        const message = extractApiErrorMessage(error);
+        showError('Không thể tắt tìm người ở ghép', message);
+      }
+    }
+  };
+
+  const handleSaveRequirements = async (requirements: Requirements, posterTraits: string[]) => {
+    if (!currentRoomId) return;
+
+    try {
+      // ⭐ Gửi cả requirements và posterTraits
+      await updateRoommatePreference(currentRoomId, {
+        enabled: true,
+        requirements,
+        posterTraits: posterTraits || [], // ⭐ Traits của Poster (User A)
+      });
+      await loadRoommatePreference(currentRoomId);
+      setShowRequirementsModal(false);
+      setCurrentRoomId(null);
+      showSuccess('Đã tạo bài đăng tìm ở ghép', 'Bài đăng đang chờ duyệt.');
+    } catch (error: any) {
+      const message = extractApiErrorMessage(error);
+      showError('Không thể tạo bài đăng', message);
+    }
+  };
+
+  const handleEditRequirements = async (roomId: number) => {
+    setCurrentRoomId(roomId);
+    setShowRequirementsModal(true);
+  };
+
 
   const handleTerminateContract = (contractId: number, roomNumber: string) => {
     setSelectedContract({ id: contractId, roomNumber });
@@ -324,6 +430,28 @@ const MyRoomsPage = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Roommate Sharing Toggle */}
+                  {room.contractStatus === 'active' && (
+                    <div className="border-t pt-4 mt-4 mb-4">
+                      <RoomSharingToggle
+                        roomId={room.roomId}
+                        enabled={roommatePreferences[room.roomId]?.enabled || false}
+                        postStatus={roommatePreferences[room.roomId]?.postStatus || null}
+                        postId={roommatePreferences[room.roomId]?.postId || null}
+                        onToggle={(enabled) => handleToggleRoommatePreference(room.roomId, enabled)}
+                        onEdit={() => handleEditRequirements(room.roomId)}
+                        onViewPost={() => {
+                          const postId = roommatePreferences[room.roomId]?.postId;
+                          if (postId) {
+                            router.push(`/room_details/roommate-${postId}`);
+                          }
+                        }}
+                        loading={loadingPreferences[room.roomId] || false}
+                      />
+                    </div>
+                  )}
+
 
                   {/* Actions */}
                   <div className="pt-4 space-y-2">
@@ -627,6 +755,24 @@ const MyRoomsPage = () => {
           }}
           onConfirm={handleConfirmTerminate}
           isLoading={terminatingContract !== null}
+        />
+
+        {/* Roommate Requirements Modal */}
+        <RoommateRequirementsModal
+          isOpen={showRequirementsModal}
+          onClose={() => {
+            setShowRequirementsModal(false);
+            setCurrentRoomId(null);
+          }}
+          onSave={handleSaveRequirements}
+          initialRequirements={
+            currentRoomId ? roommatePreferences[currentRoomId]?.requirements || null : null
+          }
+          initialPosterTraits={
+            // ⭐ Lấy posterTraits từ profile.habits (nếu có) hoặc để trống
+            Array.isArray((profile as any)?.habits) ? (profile as any).habits : []
+          }
+          loading={currentRoomId ? loadingPreferences[currentRoomId] || false : false}
         />
       </div>
     </div>
