@@ -68,7 +68,6 @@ export default function ReplyList({
           onReplyUpdated();
           hideConfirm();
         } catch (error: any) {
-          console.error('Error deleting reply:', error);
           showError('Không thể xóa phản hồi', error.message || 'Đã xảy ra lỗi');
         } finally {
           setDeletingReplyId(null);

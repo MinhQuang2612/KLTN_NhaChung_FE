@@ -57,12 +57,6 @@ export default function MatchingRequestCard({
     return 'text-yellow-600 bg-yellow-100';
   };
 
-  const getMatchScoreStars = (score: number) => {
-    if (score >= 80) return '⭐⭐⭐⭐';
-    if (score >= 60) return '⭐⭐⭐';
-    return '⭐⭐';
-  };
-
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
       {/* Header */}
@@ -80,7 +74,7 @@ export default function MatchingRequestCard({
           {getStatusBadge()}
         </div>
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMatchScoreColor(request.matchScore)}`}>
-          {request.matchScore}/100 {getMatchScoreStars(request.matchScore)}
+          {request.matchScore}/100
         </span>
       </div>
 

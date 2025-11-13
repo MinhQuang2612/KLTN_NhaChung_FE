@@ -103,8 +103,8 @@ export default function Dashboard() {
       color: "teal"
     },
     {
-      title: "Đăng ký thuê",
-      description: "Xem các yêu cầu thuê phòng và yêu cầu ở ghép của bạn",
+      title: "Đăng ký thuê và thanh toán",
+      description: "Xem các yêu cầu thuê phòng, yêu cầu ở ghép và hóa đơn thanh toán của bạn",
       icon: <FaClipboardCheck />,
       href: "/my-rentals",
       color: "blue"
@@ -117,18 +117,11 @@ export default function Dashboard() {
       color: "purple"
     },
     {
-      title: "Hóa đơn thanh toán",
-      description: "Xem và thanh toán các hóa đơn tiền phòng, điện nước",
-      icon: <FaCreditCard />,
-      href: "/payments",
-      color: "green"
-    },
-    {
-      title: "Đăng tin",
-      description: "Đăng tin cho thuê phòng hoặc tìm người ở ghép",
-      icon: <FaPen />,
-      href: "/post",
-      color: "orange"
+      title: "Yêu thích",
+      description: "Xem danh sách phòng và bài đăng bạn đã lưu",
+      icon: <FaHeart />,
+      href: "/favorites",
+      color: "red"
     },
     {
       title: "Bài đăng của tôi",
@@ -136,13 +129,6 @@ export default function Dashboard() {
       icon: <FaFileAlt />,
       href: "/my-posts",
       color: "pink"
-    },
-    {
-      title: "Yêu thích",
-      description: "Xem danh sách phòng và bài đăng bạn đã lưu",
-      icon: <FaHeart />,
-      href: "/favorites",
-      color: "red"
     },
     {
       title: "Hồ sơ cá nhân",
@@ -207,7 +193,7 @@ export default function Dashboard() {
         </div>
 
         {/* Menu Grid */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className={`grid grid-cols-1 gap-6 md:grid-cols-2 ${user.role === 'landlord' ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
           {menuItems.map((item) => (
             <DashboardCard
               key={item.title}

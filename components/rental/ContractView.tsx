@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getUserContract, downloadContractPDF, formatContractStatus, calculateContractDaysLeft } from "@/services/rentalRequests";
 import { formatCurrency, getContractPaymentStatus, RoomPaymentStatus } from "@/services/payments";
 import { useToast } from "@/contexts/ToastContext";
 import { ToastMessages } from "@/utils/toastMessages";
 import PaymentQR from "@/components/payments/PaymentQR";
+import { getRoomById } from "@/services/rooms";
+import { getUserById } from "@/services/user";
+import { getUserVerification } from "@/services/verification";
+import { FaMoneyBillWave, FaCheckCircle } from "react-icons/fa";
 
 interface ContractViewProps {
   contractId: number;
@@ -13,12 +18,17 @@ interface ContractViewProps {
 
 export default function ContractView({ contractId }: ContractViewProps) {
   const [contract, setContract] = useState<any>(null);
+  const [roomCategory, setRoomCategory] = useState<string | undefined>(undefined);
+  const [roomData, setRoomData] = useState<any>(null);
+  const [tenantInfo, setTenantInfo] = useState<{ fullName?: string; phone?: string; email?: string; cccd?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [contractPaymentStatus, setContractPaymentStatus] = useState<RoomPaymentStatus | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const { showError, showSuccess } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     loadContract();
@@ -36,6 +46,45 @@ export default function ContractView({ contractId }: ContractViewProps) {
           setLoading(true);
           const data = await getUserContract(contractId);
           setContract(data);
+          
+          // Fetch room category và utilities từ roomId
+          if (data.roomId) {
+            try {
+              const room = await getRoomById(data.roomId);
+              setRoomCategory((room as any)?.category);
+              setRoomData(room);
+              // Lưu ý: API rooms/{id}?include=building hiện tại không trả về building data cho phòng trọ
+              // Đã tạo file api_requirements/room-building-api.md để yêu cầu BE cập nhật
+            } catch (err) {
+              // Silently fail nếu không fetch được room info
+            }
+          }
+          
+          // Fetch tenant info từ tenantId
+          if (data.tenants && data.tenants.length > 0) {
+            try {
+              const tenant = await getUserById(data.tenants[0].tenantId);
+              let cccd: string | undefined = undefined;
+              
+              // Fetch verification để lấy số CCCD
+              try {
+                const verificationResponse = await getUserVerification(data.tenants[0].tenantId);
+                const verification = verificationResponse?.verification || verificationResponse?.data || verificationResponse;
+                cccd = (verification as any)?.idNumber || (verificationResponse as any)?.idNumber;
+              } catch (verificationErr) {
+                // Silently fail nếu không fetch được verification
+              }
+              
+              setTenantInfo({
+                fullName: (tenant as any)?.fullName || (tenant as any)?.name || 'N/A',
+                phone: (tenant as any)?.phone || (tenant as any)?.phoneNumber || 'N/A',
+                email: (tenant as any)?.email || 'N/A',
+                cccd: cccd || 'N/A'
+              });
+            } catch (err) {
+              // Silently fail nếu không fetch được tenant info
+            }
+          }
         } catch (error: any) {
           let errorMessage = error.message || 'Không thể tải hợp đồng';
       
@@ -114,6 +163,86 @@ export default function ContractView({ contractId }: ContractViewProps) {
     return new Date(dateString).toLocaleDateString('vi-VN');
   };
 
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatRoomCategory = (category?: string) => {
+    if (!category) return 'N/A';
+    const map: Record<string, string> = {
+      'phong-tro': 'Phòng trọ',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+    };
+    return map[category] || category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  const calculateContractMonths = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    return months;
+  };
+
+  const formatDirection = (dir?: string) => {
+    if (!dir) return undefined;
+    const map: Record<string, string> = {
+      'dong': 'Đông',
+      'tay': 'Tây',
+      'nam': 'Nam',
+      'bac': 'Bắc',
+      'dong-nam': 'Đông Nam',
+      'dong-bac': 'Đông Bắc',
+      'tay-nam': 'Tây Nam',
+      'tay-bac': 'Tây Bắc',
+    };
+    return map[dir] || dir;
+  };
+
+  const formatLegalStatus = (status?: string) => {
+    if (!status) return undefined;
+    const map: Record<string, string> = {
+      'co-so-hong': 'Có sổ hồng',
+      'dang-ky': 'Đang đăng ký',
+      'chua-dang-ky': 'Chưa đăng ký',
+    };
+    return map[status] || status;
+  };
+
+  const formatPropertyType = (type?: string) => {
+    if (!type) return undefined;
+    const map: Record<string, string> = {
+      'chung-cu': 'Chung cư',
+      'can-ho-dv': 'Căn hộ dịch vụ',
+      'officetel': 'Officetel',
+      'studio': 'Studio',
+      'nha-pho': 'Nhà phố',
+      'biet-thu': 'Biệt thự',
+      'nha-hem': 'Nhà hẻm',
+      'nha-cap4': 'Nhà cấp 4',
+    };
+    return map[type] || type;
+  };
+
+  const formatFurniture = (furniture?: string) => {
+    if (!furniture) return 'N/A';
+    const map: Record<string, string> = {
+      'full': 'Nội thất đầy đủ',
+      'co-ban': 'Nội thất cơ bản',
+      'trong': 'Nhà trống',
+    };
+    return map[furniture] || furniture;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -165,9 +294,94 @@ export default function ContractView({ contractId }: ContractViewProps) {
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-3">Thông tin phòng</h3>
               <div className="space-y-2 text-sm">
-                <p><strong>Phòng:</strong> {contract.roomInfo.roomNumber}</p>
+                {/* 1. Thông tin định danh */}
+                {roomData?.chungCuInfo?.unitCode && (
+                  <p><strong>Mã căn hộ:</strong> {roomData.chungCuInfo.unitCode}</p>
+                )}
+                {roomData?.nhaNguyenCanInfo?.unitCode && (
+                  <p><strong>Mã nhà:</strong> {roomData.nhaNguyenCanInfo.unitCode}</p>
+                )}
+                {roomCategory === 'phong-tro' && (
+                  <p><strong>Mã phòng:</strong> {contract.roomInfo.roomNumber}</p>
+                )}
+                {!(roomData?.chungCuInfo?.unitCode || roomData?.nhaNguyenCanInfo?.unitCode) && roomCategory !== 'phong-tro' && (
+                  <p><strong>Phòng:</strong> {contract.roomInfo.roomNumber}</p>
+                )}
+                
+                {/* 2. Loại */}
+                {roomCategory === 'chung-cu' && roomData?.chungCuInfo?.propertyType && (
+                  <p><strong>Loại căn hộ:</strong> {formatPropertyType(roomData.chungCuInfo.propertyType)}</p>
+                )}
+                {roomCategory === 'nha-nguyen-can' && roomData?.nhaNguyenCanInfo?.propertyType && (
+                  <p><strong>Loại nhà:</strong> {formatPropertyType(roomData.nhaNguyenCanInfo.propertyType)}</p>
+                )}
+                {roomCategory === 'phong-tro' && (
+                  <p><strong>Loại phòng:</strong> {formatRoomCategory(roomCategory)}</p>
+                )}
+                
+                {/* 3. Vị trí */}
+                {roomCategory === 'chung-cu' && roomData?.chungCuInfo && (
+                  <>
+                    {roomData.chungCuInfo.buildingName && (
+                      <p><strong>Tòa nhà:</strong> {roomData.chungCuInfo.buildingName}</p>
+                    )}
+                    {roomData.chungCuInfo.blockOrTower && (
+                      <p><strong>Block/Tower:</strong> {roomData.chungCuInfo.blockOrTower}</p>
+                    )}
+                    {roomData.chungCuInfo.floorNumber && (
+                      <p><strong>Tầng:</strong> {roomData.chungCuInfo.floorNumber}</p>
+                    )}
+                  </>
+                )}
+                {roomCategory === 'nha-nguyen-can' && (
+                  <>
+                    {roomData?.building?.name && (
+                      <p><strong>Tòa nhà:</strong> {roomData.building.name}</p>
+                    )}
+                    {roomData?.nhaNguyenCanInfo?.khuLo && (
+                      <p><strong>Khu/Lô:</strong> {roomData.nhaNguyenCanInfo.khuLo}</p>
+                    )}
+                  </>
+                )}
+                {roomCategory === 'phong-tro' && (
+                  <>
+                    {roomData?.building?.name && (
+                      <p><strong>Tòa nhà:</strong> {roomData.building.name}</p>
+                    )}
+                    {roomData?.floor && (
+                      <p><strong>Tầng:</strong> {roomData.floor}</p>
+                    )}
+                  </>
+                )}
+                
+                {/* 4. Diện tích */}
                 <p><strong>Diện tích:</strong> {contract.roomInfo.area}m²</p>
-                <p><strong>Sức chứa:</strong> {contract.roomInfo.currentOccupancy}/{contract.roomInfo.maxOccupancy} người</p>
+                {roomCategory === 'nha-nguyen-can' && roomData?.nhaNguyenCanInfo && (
+                  <>
+                    {roomData.nhaNguyenCanInfo.usableArea !== undefined && roomData.nhaNguyenCanInfo.usableArea !== null && roomData.nhaNguyenCanInfo.usableArea > 0 && (
+                      <p><strong>Diện tích sử dụng:</strong> {roomData.nhaNguyenCanInfo.usableArea}m²</p>
+                    )}
+                  </>
+                )}
+                
+                {/* 5. Cấu trúc */}
+                {(roomData?.bedrooms || roomData?.chungCuInfo?.bedrooms || roomData?.nhaNguyenCanInfo?.bedrooms) && (
+                  <p><strong>Phòng ngủ:</strong> {roomData.bedrooms || roomData.chungCuInfo?.bedrooms || roomData.nhaNguyenCanInfo?.bedrooms}</p>
+                )}
+                {(roomData?.bathrooms || roomData?.chungCuInfo?.bathrooms || roomData?.nhaNguyenCanInfo?.bathrooms) && (
+                  <p><strong>Phòng tắm:</strong> {roomData.bathrooms || roomData.chungCuInfo?.bathrooms || roomData.nhaNguyenCanInfo?.bathrooms}</p>
+                )}
+                {roomCategory === 'nha-nguyen-can' && roomData?.nhaNguyenCanInfo?.totalFloors && (
+                  <p><strong>Số tầng:</strong> {roomData.nhaNguyenCanInfo.totalFloors}</p>
+                )}
+                
+                {/* 6. Đặc điểm */}
+                {roomData?.furniture && (
+                  <p><strong>Nội thất:</strong> {formatFurniture(roomData.furniture)}</p>
+                )}
+                {roomCategory === 'nha-nguyen-can' && roomData?.nhaNguyenCanInfo?.legalStatus && (
+                  <p><strong>Tình trạng pháp lý:</strong> {formatLegalStatus(roomData.nhaNguyenCanInfo.legalStatus)}</p>
+                )}
               </div>
             </div>
 
@@ -176,20 +390,71 @@ export default function ContractView({ contractId }: ContractViewProps) {
               <div className="space-y-2 text-sm">
                 <p><strong>Tiền thuê/tháng:</strong> {formatCurrency(contract.monthlyRent)}</p>
                 <p><strong>Tiền cọc:</strong> {formatCurrency(contract.deposit)}</p>
-                <p><strong>Loại hợp đồng:</strong> {contract.contractType === 'single' ? 'Đơn lẻ' : 'Chung'}</p>
+                
+                {roomData?.utilities && (
+                  <>
+                    {roomData.utilities.electricityPricePerKwh !== undefined && roomData.utilities.electricityPricePerKwh !== null && roomData.utilities.electricityPricePerKwh > 0 && (
+                      <p>
+                        <strong>Giá điện:</strong> {formatCurrency(roomData.utilities.electricityPricePerKwh)}/kWh
+                        {roomData.utilities.includedInRent?.electricity && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.waterPrice !== undefined && roomData.utilities.waterPrice !== null && roomData.utilities.waterPrice > 0 && (
+                      <p>
+                        <strong>Giá nước:</strong> {formatCurrency(roomData.utilities.waterPrice)}
+                        {roomData.utilities.waterBillingType === 'per_m3' ? '/khối' : roomData.utilities.waterBillingType === 'per_person' ? '/người' : '/khối'}
+                        {roomData.utilities.includedInRent?.water && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.internetFee !== undefined && roomData.utilities.internetFee !== null && roomData.utilities.internetFee > 0 && (
+                      <p>
+                        <strong>Phí Internet:</strong> {formatCurrency(roomData.utilities.internetFee)}/tháng
+                        {roomData.utilities.includedInRent?.internet && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.garbageFee !== undefined && roomData.utilities.garbageFee !== null && roomData.utilities.garbageFee > 0 && (
+                      <p>
+                        <strong>Phí rác:</strong> {formatCurrency(roomData.utilities.garbageFee)}/tháng
+                        {roomData.utilities.includedInRent?.garbage && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.cleaningFee !== undefined && roomData.utilities.cleaningFee !== null && roomData.utilities.cleaningFee > 0 && (
+                      <p>
+                        <strong>Phí dọn dẹp:</strong> {formatCurrency(roomData.utilities.cleaningFee)}/tháng
+                        {roomData.utilities.includedInRent?.cleaning && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.managementFee !== undefined && roomData.utilities.managementFee !== null && roomData.utilities.managementFee > 0 && (
+                      <p>
+                        <strong>Phí quản lý:</strong> {formatCurrency(roomData.utilities.managementFee)}
+                        {roomData.utilities.managementFeeUnit === 'per_m2_per_month' ? '/m²/tháng' : '/tháng'}
+                        {roomData.utilities.includedInRent?.managementFee && <span className="text-green-600 ml-2">(Đã bao trong tiền thuê)</span>}
+                      </p>
+                    )}
+                    {roomData.utilities.parkingMotorbikeFee !== undefined && roomData.utilities.parkingMotorbikeFee !== null && roomData.utilities.parkingMotorbikeFee > 0 && (
+                      <p><strong>Phí gửi xe máy:</strong> {formatCurrency(roomData.utilities.parkingMotorbikeFee)}/tháng</p>
+                    )}
+                    {roomData.utilities.parkingCarFee !== undefined && roomData.utilities.parkingCarFee !== null && roomData.utilities.parkingCarFee > 0 && (
+                      <p><strong>Phí gửi xe ô tô:</strong> {formatCurrency(roomData.utilities.parkingCarFee)}/tháng</p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Thời gian hợp đồng */}
+          {/* Thông tin hợp đồng */}
           <div className="bg-blue-50 p-4 rounded-lg mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Thời gian hợp đồng</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">
+              Thông tin hợp đồng ({calculateContractMonths(contract.startDate, contract.endDate)} tháng)
+            </h3>
             <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <div>
+              <div className="space-y-2">
+                <p><strong>Loại hợp đồng:</strong> {contract.contractType === 'single' ? 'Đơn lẻ' : 'Chung'}</p>
                 <p><strong>Ngày bắt đầu:</strong> {formatDate(contract.startDate)}</p>
                 <p><strong>Ngày kết thúc:</strong> {formatDate(contract.endDate)}</p>
               </div>
-              <div>
+              <div className="space-y-2">
                 {contract.tenants.length > 0 && (
                   <>
                     <p><strong>Ngày chuyển vào:</strong> {formatDate(contract.tenants[0].moveInDate)}</p>
@@ -204,11 +469,16 @@ export default function ContractView({ contractId }: ContractViewProps) {
           {contract.tenants.length > 0 && (
             <div className="bg-blue-50 p-4 rounded-lg mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Thông tin người thuê</h3>
-              <div className="space-y-2 text-sm">
-                <p><strong>ID người thuê:</strong> {contract.tenants[0].tenantId}</p>
-                <p><strong>Tiền thuê cá nhân:</strong> {formatCurrency(contract.tenants[0].monthlyRent)}</p>
-                <p><strong>Tiền cọc cá nhân:</strong> {formatCurrency(contract.tenants[0].deposit)}</p>
-                <p><strong>Trạng thái:</strong> {contract.tenants[0].status === 'active' ? 'Đang hoạt động' : 'Không hoạt động'}</p>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <p><strong>Họ tên:</strong> {tenantInfo?.fullName || 'N/A'}</p>
+                  <p><strong>Số điện thoại:</strong> {tenantInfo?.phone || 'N/A'}</p>
+                  <p><strong>Số CCCD:</strong> {tenantInfo?.cccd || 'N/A'}</p>
+                </div>
+                <div className="space-y-2">
+                  <p><strong>Email:</strong> {tenantInfo?.email || 'N/A'}</p>
+                  <p><strong>Trạng thái:</strong> {contract.tenants[0].status === 'active' ? 'Đang hoạt động' : 'Không hoạt động'}</p>
+                </div>
               </div>
             </div>
           )}
@@ -226,24 +496,36 @@ export default function ContractView({ contractId }: ContractViewProps) {
           {/* Thông tin khác */}
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
             <h3 className="font-semibold text-gray-900 mb-3">Thông tin khác</h3>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <p><strong>Ngày tạo:</strong> {formatDate(contract.createdAt)}</p>
-              <p><strong>ID hợp đồng:</strong> {contract.contractId}</p>
+            <div className="space-y-3 text-sm">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-yellow-800 text-xs">
+                  <strong>Lưu ý:</strong> Nếu bạn hủy hợp đồng trước thời hạn thì sẽ không được nhận lại tiền cọc.
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <p><strong>Ngày tạo:</strong> {formatDateTime(contract.createdAt)}</p>
+              </div>
             </div>
           </div>
 
           {/* Trạng thái thanh toán đơn giản */}
           {contractPaymentStatus && (
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">💰 Trạng thái thanh toán</h3>
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FaMoneyBillWave className="text-teal-600" />
+                Trạng thái thanh toán
+              </h3>
               
               {contractPaymentStatus.paymentStatus === 'fully_paid' ? (
                 <div className="text-center py-4">
-                  <div className="text-green-600 text-lg font-medium mb-2">✅ Đã thanh toán đầy đủ</div>
+                  <div className="text-green-600 text-lg font-medium mb-2 flex items-center justify-center gap-2">
+                    <FaCheckCircle className="text-green-600" />
+                    Đã thanh toán đầy đủ
+                  </div>
                   <p className="text-gray-600 text-sm">
                     Tất cả hóa đơn đã được thanh toán. Hợp đồng hoạt động bình thường.
                   </p>
-                  <a href="/payments" className="text-blue-600 hover:text-blue-800 text-sm underline mt-2 inline-block">
+                  <a href="/my-rentals?tab=invoices" className="text-blue-600 hover:text-blue-800 text-sm underline mt-2 inline-block">
                     Xem lịch sử thanh toán
                   </a>
                 </div>
@@ -301,12 +583,19 @@ export default function ContractView({ contractId }: ContractViewProps) {
               </button>
             )}
             
-            <a
-              href="/my-rentals"
+            <button
+              onClick={() => {
+                const returnUrl = searchParams.get('returnUrl');
+                if (returnUrl) {
+                  router.push(returnUrl);
+                } else {
+                  router.back();
+                }
+              }}
               className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Quay lại danh sách
-            </a>
+            </button>
           </div>
         </div>
 

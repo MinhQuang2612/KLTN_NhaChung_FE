@@ -193,7 +193,6 @@ export default function RoomList() {
             }
             items = suggestedItems;
           } catch (e: any) {
-            console.error('Failed to load personalized posts:', e);
             items = [];
           }
         }
@@ -413,7 +412,6 @@ export default function RoomList() {
               }
               allPosts = suggestedItems;
             } catch (e: any) {
-              console.error('Failed to load personalized posts:', e);
               allPosts = [];
             }
           }

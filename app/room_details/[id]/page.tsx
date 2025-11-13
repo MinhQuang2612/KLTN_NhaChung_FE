@@ -479,7 +479,6 @@ export default function RoomDetailsPage() {
                                     reloadReviews();
                                     hideConfirm();
                                   } catch (error: any) {
-                                    console.error('Error deleting review:', error);
                                     showError('Không thể xóa đánh giá', error.message || 'Đã xảy ra lỗi');
                                   } finally {
                                     setDeletingReviewId(null);

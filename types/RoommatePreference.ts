@@ -5,6 +5,8 @@ export interface RoommatePreference {
   postId: number | null;
   postStatus: 'pending' | 'active' | 'inactive' | null;
   requirements: Requirements | null;
+  posterAge?: number; // ⭐ Tuổi của Poster từ verification (read-only)
+  posterGender?: string; // ⭐ Giới tính của Poster từ verification (read-only)
 }
 
 export interface CreateRoommatePreferenceDto {
@@ -22,6 +24,8 @@ export interface SeekerPreferenceResponse {
     maxPrice: number;
   } | null;
   seekerTraits: string[] | null;
+  seekerAge?: number; // ⭐ Tuổi đã lưu từ verification
+  seekerGender?: string; // ⭐ Giới tính đã lưu từ verification ('male' | 'female' | 'other')
   updatedAt?: string;
 }
 
@@ -50,8 +54,7 @@ export interface FindRoommateDto {
   maxPrice: number;
   personalInfo?: {
     fullName?: string;
-    age?: number;
-    gender?: 'male' | 'female' | 'other';
+    // ❌ KHÔNG GỬI age và gender NỮA - Backend tự động lấy từ verification
     occupation?: string;
     hobbies?: string[];
     // ⚠️ Bỏ habits - không dùng nữa, dùng traits ở root level

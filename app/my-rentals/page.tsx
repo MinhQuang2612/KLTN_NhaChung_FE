@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import MyRentalRequests from "@/components/rental/MyRentalRequests";
 import PendingInvoices from "@/components/payments/PendingInvoices";
 import MySharingRequests from "@/components/room_sharing/MySharingRequests";
 import UserASharingRequests from "@/components/room_sharing/UserASharingRequests";
+import Footer from "@/components/common/Footer";
 
 export default function MyRentalsPage() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get('tab');
   const [activeTab, setActiveTab] = useState<'requests' | 'invoices' | 'my-sharing' | 'pending-sharing'>('requests');
   const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (tabParam === 'invoices') {
+      setActiveTab('invoices');
+    }
+  }, [tabParam]);
 
   // Hiển thị loading khi AuthContext đang khởi tạo
   if (isLoading) {
@@ -96,14 +106,15 @@ export default function MyRentalsPage() {
             </nav>
           </div>
 
-          <div className="p-6">
-            {activeTab === 'requests' && <MyRentalRequests />}
-            {activeTab === 'invoices' && <PendingInvoices />}
-            {activeTab === 'my-sharing' && <MySharingRequests />}
-            {activeTab === 'pending-sharing' && <UserASharingRequests />}
+          <div className={`${activeTab === 'requests' || activeTab === 'my-sharing' || activeTab === 'invoices' || activeTab === 'pending-sharing' ? 'px-4 pb-6 pt-0' : 'p-6'}`}>
+            {activeTab === 'requests' && <MyRentalRequests key="requests" />}
+            {activeTab === 'invoices' && <PendingInvoices key="invoices" />}
+            {activeTab === 'my-sharing' && <MySharingRequests key="my-sharing" />}
+            {activeTab === 'pending-sharing' && <UserASharingRequests key="pending-sharing" />}
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

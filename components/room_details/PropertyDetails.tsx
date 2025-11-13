@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatNumberVN, formatPriceWithSuffix } from "../../utils/format";
 import { AgeUtils } from "@/utils/ageUtils";
@@ -11,6 +12,8 @@ import RoomSharingRequestForm from "../room_sharing/RoomSharingRequestForm";
 import { getUserById } from "@/services/user";
 import { getMyProfile as getUserProfileApi } from "@/services/userProfiles";
 import { apiGet } from "@/utils/api";
+import { useToast } from "@/contexts/ToastContext";
+import { getUserRooms } from "@/services/rooms";
 
 interface PropertyDetailsProps {
   postData: Post | null;
@@ -21,7 +24,29 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
   const [roomData, setRoomData] = useState<any>(null);
   const [showRentalForm, setShowRentalForm] = useState(false);
   const [showSharingForm, setShowSharingForm] = useState(false);
+  const [isAlreadySharing, setIsAlreadySharing] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
+  const { showWarning } = useToast();
+
+  // Kiểm tra xác thực tài khoản trước khi mở form
+  const handleRentalRequest = () => {
+    if (!user?.isVerified) {
+      showWarning('Cần xác thực tài khoản', 'Vui lòng xác thực tài khoản trước khi đăng ký thuê phòng.');
+      router.push('/profile');
+      return;
+    }
+    setShowRentalForm(true);
+  };
+
+  const handleSharingRequest = () => {
+    if (!user?.isVerified) {
+      showWarning('Cần xác thực tài khoản', 'Vui lòng xác thực tài khoản trước khi đăng ký ở ghép.');
+      router.push('/profile');
+      return;
+    }
+    setShowSharingForm(true);
+  };
   
   // Fetch room data when postData changes
   useEffect(() => {
@@ -37,6 +62,32 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
     
     fetchRoomData();
   }, [postData]);
+
+  // Kiểm tra xem user đã ở ghép phòng này chưa
+  useEffect(() => {
+    const checkSharingStatus = async () => {
+      if (!user || !postData?.roomId || postType !== 'roommate') {
+        setIsAlreadySharing(false);
+        return;
+      }
+
+      try {
+        const userRooms = await getUserRooms();
+        // Kiểm tra xem có phòng nào với roomId này và contractStatus là 'active' không
+        // Nếu user đã ở ghép phòng này, phòng đó sẽ có trong danh sách userRooms
+        const hasActiveRoom = userRooms.some((room: any) => 
+          room.roomId === Number(postData.roomId) &&
+          room.contractStatus === 'active'
+        );
+        setIsAlreadySharing(hasActiveRoom);
+      } catch (error) {
+        // Nếu lỗi thì không ẩn nút
+        setIsAlreadySharing(false);
+      }
+    };
+
+    checkSharingStatus();
+  }, [user, postData?.roomId, postType]);
 
   // --- BEGIN: custom fetch - chỉ lấy 3 trường thông tin cá nhân
   const [infoUser, setInfoUser] = useState<any>();
@@ -529,8 +580,8 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
         </div>
       </div>
 
-      {/* Action Buttons - chỉ hiển thị cho user không phải chủ nhà và không phải bài đăng của chính mình */}
-      {user?.role !== 'landlord' && user && user?.userId !== postData?.userId && (
+      {/* Action Buttons - hiển thị cho tất cả user đã đăng nhập */}
+      {user && (
         <div className="flex gap-3 pt-4 border-t border-gray-200">
           <button className="flex-1 px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -543,13 +594,14 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
           {(() => {
             const currentOccupancy = roomData?.currentOccupants || roomData?.currentOccupancy || 0;
             const hasTenant = currentOccupancy > 0;
+            const isOwner = user?.userId === postData?.userId;
 
             // Cho thuê: phòng trống thì cho đăng ký, có người thuê thì khóa
             if (postType === 'rent') {
               if (!hasTenant) {
                 return (
                   <button 
-                    onClick={() => setShowRentalForm(true)}
+                    onClick={handleRentalRequest}
                     className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -569,11 +621,14 @@ export default function PropertyDetails({ postData, postType }: PropertyDetailsP
               );
             }
 
-            // Ở ghép: luôn cho đăng ký, không kiểm tra full người theo logic mới
+            // Ở ghép: không cho đăng ký nếu là người tạo bài đăng hoặc đã ở ghép rồi
             if (postType === 'roommate') {
+              if (isOwner || isAlreadySharing) {
+                return null; // Ẩn nút nếu là người tạo bài đăng hoặc đã ở ghép rồi
+              }
               return (
                 <button 
-                  onClick={() => setShowSharingForm(true)}
+                  onClick={handleSharingRequest}
                   className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

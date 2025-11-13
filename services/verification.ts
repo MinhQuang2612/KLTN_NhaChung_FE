@@ -19,3 +19,11 @@ export async function submitVerification(verificationData: VerificationData, ski
 export async function getMyVerificationStatus(): Promise<VerificationStatus> {
   return apiGet('users/me/verification');
 }
+
+/**
+ * Get verification data of a specific user by userId
+ * Trả về thông tin verification (bao gồm dateOfBirth và gender) của user
+ */
+export async function getUserVerification(userId: string | number): Promise<any> {
+  return apiGet(`users/${userId}/verification`);
+}

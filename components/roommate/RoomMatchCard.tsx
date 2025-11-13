@@ -20,12 +20,6 @@ export default function RoomMatchCard({
     return 'text-yellow-600 bg-yellow-100';
   };
 
-  const getMatchScoreStars = (score: number) => {
-    if (score >= 80) return '⭐⭐⭐⭐';
-    if (score >= 60) return '⭐⭐⭐';
-    return '⭐⭐';
-  };
-
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
       {/* Image */}
@@ -51,7 +45,7 @@ export default function RoomMatchCard({
         {/* Match Score Badge */}
         <div className="absolute top-2 right-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getMatchScoreColor(match.matchScore)}`}>
-            {match.matchScore}/100 {getMatchScoreStars(match.matchScore)}
+            {match.matchScore}/100
           </span>
         </div>
       </div>

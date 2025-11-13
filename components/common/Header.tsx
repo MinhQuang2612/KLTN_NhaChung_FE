@@ -231,15 +231,6 @@ export default function Header() {
                         <FaDoorOpen className="text-gray-400 w-4" />
                         <span>Phòng của tôi</span>
                       </Link>
-                      
-                      <Link
-                        href="/payments"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        onClick={() => setIsUserMenuOpen(false)}
-                      >
-                        <FaCreditCard className="text-gray-400 w-4" />
-                        <span>Hóa đơn thanh toán</span>
-                      </Link>
                     </>
                   )}
 

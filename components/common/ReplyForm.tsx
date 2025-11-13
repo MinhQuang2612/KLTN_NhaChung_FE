@@ -68,7 +68,6 @@ export default function ReplyForm({
       setMedia([]);
       onReplyCreated();
     } catch (error: any) {
-      console.error('Error submitting reply:', error);
       showError(error.message || 'Không thể gửi phản hồi');
     } finally {
       setSubmitting(false);

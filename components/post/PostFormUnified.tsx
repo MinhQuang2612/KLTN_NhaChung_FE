@@ -152,11 +152,7 @@ export default function PostFormUnified({ postType, selectedRoom, onBack, onSucc
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Debug: Log user info
-    
     // Không chặn nếu thiếu email/phone; sẽ cố gắng lấy từ profile hoặc bỏ qua
-    
-    
     setLoading(true);
     
     try {

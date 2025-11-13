@@ -83,7 +83,6 @@ export default function LandlordVerificationPage() {
       alert('✅ Đã hoàn tất đăng ký chủ nhà! Vui lòng đăng nhập.');
       router.push('/login');
     } catch (error) {
-      console.error('Error submitting verification with license:', error);
       alert('❌ Có lỗi xảy ra khi lưu giấy phép kinh doanh. Vui lòng thử lại.');
     }
   };

@@ -22,6 +22,7 @@ import {
 import { Requirements } from '@/types/Post';
 import { useRouter } from 'next/navigation';
 import { getMyProfile } from '@/services/userProfiles';
+import Footer from '@/components/common/Footer';
 
 const MyRoomsPage = () => {
   const { user, isLoading } = useAuth();
@@ -456,7 +457,7 @@ const MyRoomsPage = () => {
                   {/* Actions */}
                   <div className="pt-4 space-y-2">
                     <Link 
-                      href={`/contracts/${room.contractId}`}
+                      href={`/contracts/${room.contractId}?returnUrl=/my-rooms`}
                       className="w-full bg-teal-600 text-white text-center py-2 px-4 rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium inline-block"
                     >
                       Xem hợp đồng
@@ -772,9 +773,12 @@ const MyRoomsPage = () => {
             // ⭐ Lấy posterTraits từ profile.habits (nếu có) hoặc để trống
             Array.isArray((profile as any)?.habits) ? (profile as any).habits : []
           }
+          posterAge={currentRoomId ? roommatePreferences[currentRoomId]?.posterAge || null : null}
+          posterGender={currentRoomId ? roommatePreferences[currentRoomId]?.posterGender || null : null}
           loading={currentRoomId ? loadingPreferences[currentRoomId] || false : false}
         />
       </div>
+      <Footer />
     </div>
   );
 };

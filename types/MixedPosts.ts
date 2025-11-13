@@ -1,7 +1,7 @@
 import { RentPostApi } from "./RentPostApi";
 import type { Address } from "./RentPost";
 import { addressService } from "../services/address";
-import { RoommatePost } from "../services/roommatePosts";
+import { Post } from "./Post";
 
 // Unified type cho hiển thị cả rent posts và roommate posts
 export interface UnifiedPost {
@@ -22,7 +22,7 @@ export interface UnifiedPost {
   createdAt: string;
   
   // Original data để có thể truy cập thêm thông tin nếu cần
-  originalData: RentPostApi | RoommatePost;
+  originalData: RentPostApi | Post;
 }
 
 // Helper functions để convert
@@ -52,7 +52,7 @@ export function rentPostToUnified(post: RentPostApi): UnifiedPost {
   };
 }
 
-export function roommatePostToUnified(post: RoommatePost): UnifiedPost {
+export function roommatePostToUnified(post: Post): UnifiedPost {
   return {
     id: (post as any).roommatePostId || post.postId,
     type: 'roommate',

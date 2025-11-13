@@ -39,8 +39,12 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
   const [loading, setLoading] = useState(true);
   const [creatingConversation, setCreatingConversation] = useState(false);
 
-  // Check if user is viewing their own post or if user is landlord
-  const shouldHideButtons = user?.role === 'landlord' || user?.userId === postData?.userId;
+  // Check if user is viewing their own post
+  // Với bài đăng cho thuê: ẩn nếu user là landlord hoặc là người tạo bài đăng
+  // Với bài đăng ở ghép: chỉ ẩn nếu user là người tạo bài đăng (landlord vẫn có thể liên hệ)
+  const shouldHideButtons = postType === 'rent' 
+    ? (user?.role === 'landlord' || user?.userId === postData?.userId)
+    : (user?.userId === postData?.userId);
 
   const refreshUserStats = useCallback(async () => {
     if (!postData?.userId) return;
@@ -151,12 +155,32 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
     try {
       setCreatingConversation(true);
       const currentUserId = Number((user as any).userId ?? (user as any).id);
-      const landlordId = postData.userId;
       const currentPostId = postData.postId || (postData as ExtendedPost).id;
 
-      // Determine tenant and landlord
-      // If current user is the landlord, they can't contact themselves
-      if (currentUserId === landlordId) {
+      // Determine tenant and landlord based on postType
+      let tenantId: number;
+      let landlordId: number;
+
+      if (postType === 'rent') {
+        // Bài đăng cho thuê: postData.userId là landlord
+        landlordId = postData.userId;
+        tenantId = currentUserId;
+      } else {
+        // Bài đăng ở ghép: postData.userId là tenant (người tạo bài đăng)
+        // postData.landlordId là landlord (chủ nhà)
+        if (currentUserId === postData.landlordId) {
+          // Landlord muốn liên hệ với tenant
+          landlordId = currentUserId;
+          tenantId = postData.userId;
+        } else {
+          // Tenant hoặc người khác muốn liên hệ với landlord
+          landlordId = postData.landlordId || postData.userId; // Fallback nếu không có landlordId
+          tenantId = currentUserId;
+        }
+      }
+
+      // If current user is trying to contact themselves
+      if (currentUserId === landlordId && currentUserId === tenantId) {
         showError('Lỗi', 'Bạn không thể liên hệ với chính mình');
         return;
       }
@@ -164,7 +188,7 @@ export default function ContactCard({ postData, postType }: ContactCardProps) {
       // Create or get conversation
       // Backend sẽ tự động tạo system message nếu chưa có tin nhắn về postId này
       const conversation = await createOrGetConversation({
-        tenantId: currentUserId,
+        tenantId: tenantId,
         landlordId: landlordId,
         postId: currentPostId,
         roomId: postData.roomId,

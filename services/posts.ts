@@ -194,13 +194,6 @@ export async function getRoomsForRent(): Promise<RoomForPost[]> {
 }
 
 /**
- * Lấy phòng cho ở ghép (có chỗ trống + cho phép ở ghép)
- */
-export async function getRoomsForRoommate(): Promise<RoomForPost[]> {
-  return getUserRooms('tim-o-ghep');
-}
-
-/**
  * Lấy tất cả phòng available
  */
 export async function getAllAvailableRooms(): Promise<RoomForPost[]> {

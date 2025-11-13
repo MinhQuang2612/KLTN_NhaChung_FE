@@ -45,7 +45,6 @@ export default function RentalHistory({ onCountChange }: RentalHistoryProps) {
       // Nếu lỗi 400 "User not found" - có thể do API chưa implement
       // Chỉ set history = [] và không show error toast để tránh làm phiền user
       if (error?.status === 400 || error?.body?.statusCode === 400) {
-        console.warn('Rental history API chưa implement hoặc có lỗi:', error);
         setHistory([]);
         setTotalCount(0);
         if (onCountChange) {

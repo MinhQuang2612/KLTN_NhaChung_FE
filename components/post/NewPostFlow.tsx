@@ -24,12 +24,17 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
   const [selectedRoom, setSelectedRoom] = useState<RoomForPost | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Tự động xác định loại bài đăng theo role
+  // Chặn người thuê - chỉ cho phép landlord
+  useEffect(() => {
+    if (user && user.role !== 'landlord') {
+      onClose();
+    }
+  }, [user, onClose]);
+
+  // Tự động xác định loại bài đăng theo role - chỉ cho landlord
   useEffect(() => {
     if (user?.role === 'landlord') {
       setSelectedType('rent');
-    } else {
-      setSelectedType('roommate');
     }
   }, [user?.role]);
 
@@ -206,7 +211,7 @@ export default function NewPostFlow({ onClose, onSuccess }: NewPostFlowProps) {
                   </span>
                 </div>
                 <h2 className="text-xl font-bold text-gray-900">
-                  {user?.role === 'landlord' ? 'Đăng tin cho thuê' : 'Đăng tin tìm ở ghép'}
+                  Đăng tin cho thuê
                 </h2>
               </div>
             </div>

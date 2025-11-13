@@ -63,11 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem("user", JSON.stringify(parsedUser));
             } catch (verificationError: any) {
               // Nếu không lấy được verification status, giữ nguyên giá trị từ storedUser
-              console.warn("⚠️ API Verification Error (khởi tạo):", {
-                status: verificationError?.status,
-                message: verificationError?.message,
-                endpoint: 'GET /users/me/verification'
-              });
               // 401 = Backend chưa implement hoặc có bug authentication
               // Giữ nguyên isVerified từ storedUser
             }
@@ -88,11 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               userData.isVerified = verificationStatus.isVerified;
             } catch (verificationError: any) {
               // Nếu không lấy được verification status, giữ nguyên giá trị từ userData
-              console.warn("⚠️ API Verification Error (load profile):", {
-                status: verificationError?.status,
-                message: verificationError?.message,
-                endpoint: 'GET /users/me/verification'
-              });
             }
             
             setUser(userData);
@@ -151,11 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userWithVerification = { ...user, isVerified: verificationStatus.isVerified };
       } catch (verificationError: any) {
         // Nếu không lấy được verification status, giữ nguyên giá trị từ user
-        console.warn("⚠️ API Verification Error (login):", {
-          status: verificationError?.status,
-          message: verificationError?.message,
-          endpoint: 'GET /users/me/verification'
-        });
       }
       
       // Lưu user info vào localStorage
@@ -186,11 +171,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userData.isVerified = verificationStatus.isVerified;
         } catch (verificationError: any) {
           // Nếu không lấy được verification status, giữ nguyên giá trị từ userData
-          console.warn("⚠️ API Verification Error (refreshUser):", {
-            status: verificationError?.status,
-            message: verificationError?.message,
-            endpoint: 'GET /users/me/verification'
-          });
         }
         
         setUser(userData);

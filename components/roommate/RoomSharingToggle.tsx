@@ -71,7 +71,7 @@ export default function RoomSharingToggle({
       {/* Toggle */}
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-3 cursor-pointer">
-          <div className="relative">
+          <div className="relative flex items-center">
             <input
               type="checkbox"
               checked={enabled}
@@ -80,14 +80,14 @@ export default function RoomSharingToggle({
               className="sr-only"
             />
             <div
-              className={`w-11 h-6 rounded-full transition-colors duration-200 ${
+              className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center ${
                 enabled ? 'bg-teal-600' : 'bg-gray-300'
               } ${isToggling || loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
                   enabled ? 'translate-x-5' : 'translate-x-0.5'
-                } mt-0.5`}
+                }`}
               />
             </div>
           </div>

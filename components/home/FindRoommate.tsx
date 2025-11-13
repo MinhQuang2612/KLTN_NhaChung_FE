@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { findRoommate, findRoommateAuto, getSeekerPreference } from "../../services/roommatePreferences";
 import { FindRoommateDto, RoomMatch, SeekerPreferenceResponse } from "../../types/RoommatePreference";
@@ -13,14 +14,15 @@ import { getMyProfile } from "../../services/userProfiles";
   
 export default function FindRoommate() {
   const { user } = useAuth();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showWarning } = useToast();
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [matches, setMatches] = useState<RoomMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [lastRequirements, setLastRequirements] = useState<Requirements | null>(null);
-  const [lastPersonalInfo, setLastPersonalInfo] = useState<{ age: number; gender: 'male' | 'female' | 'other' } | null>(null);
+  // ❌ KHÔNG CẦN lastPersonalInfo NỮA - Backend tự động lấy age và gender từ verification
   const [seekerPreferences, setSeekerPreferences] = useState<SeekerPreferenceResponse | null>(null);
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoMatchCalled, setAutoMatchCalled] = useState(false);
@@ -98,64 +100,35 @@ export default function FindRoommate() {
         setMatches([]);
       }
     } catch (error: any) {
+      const message = extractApiErrorMessage(error);
       // Xử lý lỗi 400/404 (không có preferences hoặc không có matches)
       if (error?.status === 404 || error?.status === 400) {
+        // Kiểm tra xem có phải lỗi verification không
+        if (message?.includes('xác thực lại tài khoản') || message?.includes('xác thực')) {
+          showError(
+            'Yêu cầu xác thực tài khoản', 
+            'Vui lòng xác thực lại tài khoản để sử dụng tính năng này.'
+          );
+        }
         setHasSearched(true);
         setShowForm(false);
         setMatches([]);
+      } else {
+        // Lỗi khác - hiển thị thông báo
+        if (message?.includes('xác thực lại tài khoản') || message?.includes('xác thực')) {
+          showError(
+            'Yêu cầu xác thực tài khoản', 
+            'Vui lòng xác thực lại tài khoản để sử dụng tính năng này.'
+          );
+        }
       }
-      // Lỗi khác (500, etc.) - để backend fix, không xử lý ở đây
     } finally {
       setAutoLoading(false);
       setLoading(false);
     }
   };
 
-  // Helper: Lấy personalInfo từ user/profile
-  const getInitialPersonalInfo = (): { age: number; gender: 'male' | 'female' | 'other' } | null => {
-    if (lastPersonalInfo) {
-      return lastPersonalInfo;
-    }
-
-    // Tính age từ dateOfBirth nếu có
-    let age: number | undefined;
-    if ((profile as any)?.age) {
-      age = (profile as any).age;
-    } else if ((user as any)?.dateOfBirth) {
-      try {
-        const dob = new Date((user as any).dateOfBirth);
-        const today = new Date();
-        age = today.getFullYear() - dob.getFullYear();
-        const monthDiff = today.getMonth() - dob.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-          age--;
-        }
-      } catch {
-        // Ignore date parsing errors
-      }
-    }
-
-    // Chuẩn hóa gender
-    let gender: 'male' | 'female' | 'other' = 'male';
-    const userGender = (profile as any)?.gender || (user as any)?.gender;
-    if (userGender) {
-      const normalizedGender = String(userGender).toLowerCase();
-      if (normalizedGender === 'male' || normalizedGender === 'nam') {
-        gender = 'male';
-      } else if (normalizedGender === 'female' || normalizedGender === 'nữ') {
-        gender = 'female';
-      } else {
-        gender = 'other';
-      }
-    }
-
-    // Trả về personalInfo nếu có age, nếu không trả về null (form sẽ dùng giá trị mặc định)
-    if (age && age >= 18) {
-      return { age, gender };
-    }
-
-    return null;
-  };
+  // ❌ KHÔNG CẦN getInitialPersonalInfo NỮA - Backend tự động lấy age và gender từ verification
 
   // Chỉ hiển thị khi user đã đăng nhập
   if (!user) {
@@ -163,20 +136,32 @@ export default function FindRoommate() {
   }
 
   const handleSetupForm = () => {
+    // Kiểm tra xác thực tài khoản
+    if (!user?.isVerified) {
+      showWarning('Cần xác thực tài khoản', 'Vui lòng xác thực tài khoản trước khi thiết lập form tìm người ở ghép.');
+      router.push('/profile');
+      return;
+    }
     setShowForm(true);
   };
 
   const handleFindRoommate = async (
     requirements: Requirements,
-    personalInfo: { age: number; gender: 'male' | 'female' | 'other' },
-    seekerTraits: string[]
+    seekerTraits: string[] // ❌ KHÔNG CẦN personalInfo NỮA - Backend tự động lấy age và gender từ verification
   ) => {
+    // Kiểm tra xác thực tài khoản
+    if (!user?.isVerified) {
+      showWarning('Cần xác thực tài khoản', 'Vui lòng xác thực tài khoản trước khi tìm người ở ghép.');
+      router.push('/profile');
+      return;
+    }
+
     try {
       setLoading(true);
       setLastRequirements(requirements);
-      setLastPersonalInfo(personalInfo);
 
-      // Tạo FindRoommateDto từ requirements và personalInfo
+      // Tạo FindRoommateDto từ requirements
+      // ❌ KHÔNG GỬI age và gender trong personalInfo - Backend tự động lấy từ verification
       const findRoommateDto: FindRoommateDto = {
         ageRange: requirements.ageRange,
         gender: requirements.gender,
@@ -184,8 +169,7 @@ export default function FindRoommate() {
         maxPrice: requirements.maxPrice,
         personalInfo: {
           fullName: (user as any)?.fullName || (user as any)?.name || (profile as any)?.fullName || '',
-          age: personalInfo.age,
-          gender: personalInfo.gender,
+          // ❌ KHÔNG GỬI age và gender - Backend tự động lấy từ verification
           occupation: (profile as any)?.occupation || (user as any)?.occupation || undefined,
           hobbies: Array.isArray((profile as any)?.hobbies) ? (profile as any).hobbies : [],
           lifestyle: (profile as any)?.lifestyle || 'normal',
@@ -217,7 +201,15 @@ export default function FindRoommate() {
       }
     } catch (error: any) {
       const message = extractApiErrorMessage(error);
-      showError('Không thể tìm phòng', message || 'Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.');
+      // Xử lý error khi không có verification
+      if (message?.includes('xác thực lại tài khoản') || message?.includes('xác thực')) {
+        showError(
+          'Yêu cầu xác thực tài khoản', 
+          'Vui lòng xác thực lại tài khoản để sử dụng tính năng này. Tuổi và giới tính của bạn sẽ được lấy từ thông tin xác thực.'
+        );
+      } else {
+        showError('Không thể tìm phòng', message || 'Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.');
+      }
     } finally {
       setLoading(false);
     }
@@ -248,27 +240,26 @@ export default function FindRoommate() {
           </div>
         )}
 
-        {/* Setup Form Button - Chỉ hiển thị khi chưa có preferences hoặc chưa searched */}
-        {!seekerPreferences?.hasPreferences && !hasSearched && !autoLoading && seekerPreferences !== null && (
+        {/* Form Button - Hiển thị khi đã load xong preferences */}
+        {!autoLoading && seekerPreferences !== null && (
           <div className="mb-6">
-            <button
-              onClick={handleSetupForm}
-              className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
-            >
-              Thiết lập form
-            </button>
-          </div>
-        )}
-
-        {/* Search Again Button - Hiển thị khi đã có preferences hoặc đã searched */}
-        {(seekerPreferences?.hasPreferences || hasSearched) && !autoLoading && (
-          <div className="mb-6">
-            <button
-              onClick={handleSetupForm}
-              className="px-4 py-2 text-teal-600 border border-teal-600 rounded-lg hover:bg-teal-50 transition-colors font-medium"
-            >
-              {seekerPreferences?.hasPreferences ? 'Sửa form tìm kiếm' : 'Tìm kiếm lại'}
-            </button>
+            {!seekerPreferences?.hasPreferences ? (
+              // Lần đầu - chưa có preferences
+              <button
+                onClick={handleSetupForm}
+                className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
+              >
+                Thiết lập form
+              </button>
+            ) : (
+              // Đã có preferences - hiển thị "Chỉnh sửa form"
+              <button
+                onClick={handleSetupForm}
+                className="px-4 py-2 text-teal-600 border border-teal-600 rounded-lg hover:bg-teal-50 transition-colors font-medium"
+              >
+                Chỉnh sửa form
+              </button>
+            )}
           </div>
         )}
 
@@ -320,8 +311,9 @@ export default function FindRoommate() {
           onClose={() => setShowForm(false)}
           onSave={handleFindRoommate}
           initialRequirements={lastRequirements || seekerPreferences?.requirements as Requirements || null}
-          initialPersonalInfo={lastPersonalInfo || getInitialPersonalInfo() || null}
           initialSeekerTraits={seekerPreferences?.seekerTraits || null}
+          seekerAge={seekerPreferences?.seekerAge || null}
+          seekerGender={seekerPreferences?.seekerGender || null}
           loading={loading}
         />
       </div>

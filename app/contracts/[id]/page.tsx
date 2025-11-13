@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import ContractView from "@/components/rental/ContractView";
 
@@ -57,7 +58,14 @@ export default function ContractDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <ContractView contractId={contractId} />
+        <Suspense fallback={
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Đang tải...</p>
+          </div>
+        }>
+          <ContractView contractId={contractId} />
+        </Suspense>
       </div>
     </div>
   );

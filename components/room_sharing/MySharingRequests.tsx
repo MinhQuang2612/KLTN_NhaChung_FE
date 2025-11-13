@@ -4,14 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { getMySharingRequests, RoomSharingRequest } from '@/services/roomSharing';
 import { getRoomById } from '@/services/rooms';
 import { addressService } from '@/services/address';
+import { getUserContract } from '@/services/rentalRequests';
 import { useToast } from '@/contexts/ToastContext';
 import { ToastMessages } from '@/utils/toastMessages';
 import Link from 'next/link';
+import { FaCheckCircle } from 'react-icons/fa';
 
 const MySharingRequests: React.FC = () => {
   const [requests, setRequests] = useState<RoomSharingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [contractStatuses, setContractStatuses] = useState<Record<number, 'draft' | 'active' | 'expired' | 'terminated'>>({});
   const { showError } = useToast();
 
   const loadRequests = async () => {
@@ -49,6 +52,21 @@ const MySharingRequests: React.FC = () => {
       }));
       
       setRequests(augmented);
+      
+      // Fetch contract statuses cho các requests có contractId
+      const contractStatusMap: Record<number, 'draft' | 'active' | 'expired' | 'terminated'> = {};
+      const requestsWithContracts = requestsList.filter(r => r.contractId);
+      await Promise.all(requestsWithContracts.map(async (r) => {
+        if (r.contractId) {
+          try {
+            const contract = await getUserContract(r.contractId);
+            contractStatusMap[r.contractId] = contract.status;
+          } catch (err) {
+            // Silently fail nếu không fetch được contract
+          }
+        }
+      }));
+      setContractStatuses(contractStatusMap);
     } catch (err: any) {
       setError('Không thể tải danh sách yêu cầu ở ghép. Vui lòng thử lại sau.');
       const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
@@ -83,7 +101,7 @@ const MySharingRequests: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -133,7 +151,7 @@ const MySharingRequests: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       {requests.length === 0 ? (
         <div className="text-center py-8">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -151,61 +169,79 @@ const MySharingRequests: React.FC = () => {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          {requests.map((request: any) => (
-            <div key={request.requestId} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
-                    </h3>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                      {getStatusText(request.status)}
-                    </span>
-                  </div>
-                  
-                  {(request.buildingName || request.address) && (
-                    <p className="text-sm text-gray-600 mb-2">
-                      {request.buildingName && <span className="font-medium">{request.buildingName}</span>}
-                      {request.buildingName && request.address && <span> • </span>}
-                      {request.address}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div>
-                      <strong>Loại phòng:</strong> {formatRoomCategory(request.roomCategory) || 'N/A'}
-                    </div>
-                    <div>
-                      <strong>Ngày dọn vào:</strong> {formatDate(request.requestedMoveInDate)}
-                    </div>
-                    <div>
-                      <strong>Thời hạn:</strong> {request.requestedDuration} tháng
-                    </div>
-                  </div>
+        <div>
+          {requests.map((request: any, index: number) => (
+            <div 
+              key={request.requestId} 
+              className={`py-5 px-4 ${index !== requests.length - 1 ? 'border-b border-gray-200' : ''} hover:bg-gray-50/50 transition-colors`}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
+                  </h3>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                    {getStatusText(request.status)}
+                  </span>
                 </div>
                 {request.status === 'approved' && request.contractId && (
                   <Link
-                    href={`/contracts/${request.contractId}`}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 transition-colors ml-4"
+                    href={request.contractId && contractStatuses[request.contractId] === 'terminated' ? '#' : `/contracts/${request.contractId}`}
+                    onClick={(e) => {
+                      if (request.contractId && contractStatuses[request.contractId] === 'terminated') {
+                        e.preventDefault();
+                      }
+                    }}
+                    className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                      request.contractId && contractStatuses[request.contractId] === 'terminated'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-teal-600 text-white hover:bg-teal-700'
+                    }`}
                   >
                     Xem hợp đồng
                   </Link>
                 )}
               </div>
+              
+              {(request.buildingName || request.address) && (
+                <p className="text-sm text-gray-600 mb-3">
+                  {request.buildingName && <span className="font-medium">{request.buildingName}</span>}
+                  {request.buildingName && request.address && <span> • </span>}
+                  {request.address}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">Loại phòng:</span>
+                  <span className="font-medium text-gray-900">{formatRoomCategory(request.roomCategory) || 'N/A'}</span>
+                </div>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">Ngày dọn vào:</span>
+                  <span className="font-medium text-gray-900">{formatDate(request.requestedMoveInDate)}</span>
+                </div>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">Thời hạn:</span>
+                  <span className="font-medium text-gray-900">{request.requestedDuration} tháng</span>
+                </div>
+              </div>
 
               {request.message && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600 text-sm">Lời nhắn của bạn:</span>
-                  <p className="text-gray-900 text-sm mt-1">{request.message}</p>
+                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <span className="font-bold text-blue-900 text-sm">Lời nhắn của bạn:</span>
+                  <p className="text-blue-800 text-sm mt-1">{request.message}</p>
                 </div>
               )}
 
-              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
-                <span>Gửi lúc: {formatDate(request.createdAt)}</span>
+              <div className="flex justify-between items-center pt-3">
+                <span className="text-xs text-gray-500">Gửi lúc: {formatDate(request.createdAt)}</span>
                 {request.status === 'approved' && (
-                  <span className="text-green-600 font-medium">✅ Hợp đồng đã được tạo</span>
+                  <span className="flex items-center gap-1 text-green-600 font-medium text-xs">
+                    <FaCheckCircle className="w-3 h-3" />
+                    Hợp đồng đã được tạo
+                  </span>
                 )}
               </div>
             </div>

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { createRoomSharingRequest, CreateRoomSharingRequestData } from '@/services/roomSharing';
 import { useToast } from '@/contexts/ToastContext';
 import { ToastMessages } from '@/utils/toastMessages';
@@ -24,10 +26,20 @@ const RoomSharingRequestForm: React.FC<RoomSharingRequestFormProps> = ({
     requestedDuration: 12
   });
   const [loading, setLoading] = useState(false);
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
+  const router = useRouter();
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Kiểm tra xác thực tài khoản
+    if (!user?.isVerified) {
+      showWarning('Cần xác thực tài khoản', 'Vui lòng xác thực tài khoản trước khi đăng ký ở ghép.');
+      router.push('/profile');
+      return;
+    }
+
     setLoading(true);
     
     try {

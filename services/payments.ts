@@ -6,8 +6,10 @@ export interface Invoice {
   invoiceId: number;
   amount: number;
   dueDate: string;
-  invoiceType: 'rent' | 'deposit' | 'utility' | 'other';
+  invoiceType: 'rent' | 'monthly_rent' | 'deposit' | 'utility' | 'other';
   roomNumber: string;
+  roomId?: number;
+  contractId?: number;
   isQrGenerated: boolean;
   canPay: boolean;
   description?: string;
@@ -134,9 +136,11 @@ export async function checkPaymentStatus(orderId: string): Promise<PaymentStatus
 /**
  * Format loại hóa đơn
  */
-export function formatInvoiceType(type: Invoice['invoiceType']): string {
+export function formatInvoiceType(type: Invoice['invoiceType'] | string): string {
   switch (type) {
     case 'rent': return 'Tiền thuê';
+    case 'monthly_rent': return 'Tiền thuê hàng tháng';
+    case 'initial_payment': return 'Thanh toán đầu tiên';
     case 'deposit': return 'Tiền cọc';
     case 'utility': return 'Tiền điện nước';
     case 'other': return 'Khác';
