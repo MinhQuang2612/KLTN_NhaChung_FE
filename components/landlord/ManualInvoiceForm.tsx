@@ -15,8 +15,9 @@ import {
   LandlordContractSummary
 } from "@/services/rentalRequests";
 import { getRoomById } from "@/services/rooms";
-import { FaFilter, FaInfoCircle, FaPlus, FaTrashAlt } from "react-icons/fa";
+import { FaInfoCircle, FaPlus, FaTrashAlt } from "react-icons/fa";
 import { FaMoneyBillWave } from "react-icons/fa6";
+import InvoiceHistory from "./InvoiceHistory";
 
 interface ManualInvoiceFormProps {
   onOpenMaintenanceModal?: () => void;
@@ -41,7 +42,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
   const [result, setResult] = useState<any>(null);
   const [loadingContracts, setLoadingContracts] = useState(false);
   const [contracts, setContracts] = useState<LandlordContractWithExtras[]>([]);
-  const [contractSearch, setContractSearch] = useState("");
   const [roomIdToCategory, setRoomIdToCategory] = useState<Record<number, string>>({});
   const [validatingContract, setValidatingContract] = useState(false);
   const [contractLocked, setContractLocked] = useState(false);
@@ -56,7 +56,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
     waterStart: "",
     waterEnd: "",
     includeRent: true,
-    note: "",
   });
   
 
@@ -114,24 +113,8 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
 
   const filteredContracts = useMemo(() => {
     // Chỉ hiển thị hợp đồng loại single theo yêu cầu
-    const base = contracts.filter((c) => (c.contractType ?? "single") === "single");
-    if (!contractSearch.trim()) return base;
-    const term = contractSearch.toLowerCase();
-    return base.filter((c) => {
-      const roomNumber = c?.roomInfo?.roomNumber ? String(c.roomInfo.roomNumber) : "";
-      const tenant = c?.tenantName || "";
-      const contractId = c?.contractId ? String(c.contractId) : "";
-      const building = c?.roomInfo?.buildingName || "";
-      return [roomNumber, tenant, contractId, building].some((value) =>
-        String(value).toLowerCase().includes(term)
-      );
-    });
-  }, [contracts, contractSearch]);
-
-  const selectedContract = useMemo(() => {
-    if (!form.contractId) return null;
-    return contracts.find((c) => String(c.contractId) === String(form.contractId));
-  }, [contracts, form.contractId]);
+    return contracts.filter((c) => (c.contractType ?? "single") === "single");
+  }, [contracts]);
 
   const translateCategory = (cat?: string) => {
     if (!cat) return "";
@@ -235,7 +218,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
       waterStart: form.waterStart ? Number(form.waterStart) : undefined,
       waterEnd: form.waterEnd ? Number(form.waterEnd) : undefined,
       includeRent: form.includeRent,
-      note: form.note || undefined,
       otherItems: otherItems
         .filter((it) => it.description && it.amount)
         .map((it) => ({ description: it.description, amount: Number(it.amount), type: it.type || "other" })),
@@ -259,7 +241,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
         waterStart: "",
         waterEnd: "",
         includeRent: true,
-        note: "",
       };
       setForm(nextForm);
       setOtherItems([]);
@@ -304,98 +285,182 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
     }, 0);
   }, [otherItems]);
 
+  const [activeTab, setActiveTab] = useState<"form" | "history">("form");
+
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Tạo hoá đơn thủ công</h2>
-          <p className="text-sm text-slate-500">
-            Chuẩn bị số liệu, chọn hợp đồng và nhập nhanh các khoản phí trong kỳ.
-          </p>
+    <div>
+      {/* Tab Navigation */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab("form")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "form"
+                  ? "border-teal-500 text-teal-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Tạo hóa đơn
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "history"
+                  ? "border-teal-500 text-teal-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Lịch sử tính tiền
+            </button>
+          </nav>
         </div>
-        {onOpenMaintenanceModal && (
-          <button
-            onClick={onOpenMaintenanceModal}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-teal-500 hover:text-teal-600"
-          >
-            Thanh toán phí duy trì
-          </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        {activeTab === "form" ? (
+          <div className="p-6">
+            <InvoiceFormContent
+              onOpenMaintenanceModal={onOpenMaintenanceModal}
+              form={form}
+              setForm={setForm}
+              otherItems={otherItems}
+              setOtherItems={setOtherItems}
+              contracts={contracts}
+              filteredContracts={filteredContracts}
+              loadingContracts={loadingContracts}
+              contractLocked={contractLocked}
+              roomIdToCategory={roomIdToCategory}
+              submitting={submitting}
+              validatingContract={validatingContract}
+              result={result}
+              electricityUsage={electricityUsage}
+              waterUsage={waterUsage}
+              totalExtraItems={totalExtraItems}
+              onChange={onChange}
+              addOtherItem={addOtherItem}
+              removeOtherItem={removeOtherItem}
+              changeOtherItem={changeOtherItem}
+              handleSubmit={handleSubmit}
+              translateCategory={translateCategory}
+              translateContractStatus={translateContractStatus}
+              translateInvoiceStatus={translateInvoiceStatus}
+            />
+          </div>
+        ) : (
+          <InvoiceHistory />
         )}
-      </header>
+      </div>
+    </div>
+  );
+}
+
+interface InvoiceFormContentProps {
+  onOpenMaintenanceModal?: () => void;
+  form: any;
+  setForm: any;
+  otherItems: OtherItemInput[];
+  setOtherItems: any;
+  contracts: LandlordContractWithExtras[];
+  filteredContracts: LandlordContractWithExtras[];
+  loadingContracts: boolean;
+  contractLocked: boolean;
+  roomIdToCategory: Record<number, string>;
+  submitting: boolean;
+  validatingContract: boolean;
+  result: any;
+  electricityUsage: number | null;
+  waterUsage: number | null;
+  totalExtraItems: number;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  addOtherItem: () => void;
+  removeOtherItem: (idx: number) => void;
+  changeOtherItem: (idx: number, key: keyof OtherItemInput, value: string) => void;
+  handleSubmit: (e: FormEvent) => void;
+  translateCategory: (cat?: string) => string;
+  translateContractStatus: (s?: string) => string;
+  translateInvoiceStatus: (s?: string) => string;
+}
+
+function InvoiceFormContent({
+  onOpenMaintenanceModal,
+  form,
+  setForm,
+  otherItems,
+  filteredContracts,
+  loadingContracts,
+  contractLocked,
+  roomIdToCategory,
+  submitting,
+  validatingContract,
+  result,
+  electricityUsage,
+  waterUsage,
+  totalExtraItems,
+  onChange,
+  addOtherItem,
+  removeOtherItem,
+  changeOtherItem,
+  handleSubmit,
+  translateCategory,
+  translateContractStatus,
+  translateInvoiceStatus,
+}: InvoiceFormContentProps) {
+  return (
+    <>
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="space-y-6"
       >
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">Thông tin hợp đồng</h3>
-          <p className="text-xs text-slate-500">
-            Chọn hợp đồng đang hiệu lực để hệ thống biết phòng nào cần tính tiền.
-          </p>
-          <div className="flex flex-col gap-6 md:flex-row">
-            <div className="flex-1 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Tìm nhanh hợp đồng
-                </label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                    <FaFilter className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500"
-                    placeholder="Nhập mã hợp đồng, phòng hoặc tên khách"
-                    value={contractSearch}
-                    onChange={(e) => setContractSearch(e.target.value)}
-                    disabled={contractLocked}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Chọn hợp đồng
-                </label>
-                <select
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500"
-                  value={form.contractId}
-                  onChange={(e) => setForm((prev) => ({ ...prev, contractId: e.target.value }))}
-                  disabled={contractLocked}
-                >
-                  <option value="">
-                    {loadingContracts ? "Đang tải hợp đồng..." : "-- Chọn hợp đồng --"}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Thông tin hợp đồng</h3>
+            {onOpenMaintenanceModal && (
+              <button
+                type="button"
+                onClick={onOpenMaintenanceModal}
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700"
+              >
+                Thanh toán phí duy trì
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Chọn hợp đồng
+            </label>
+            <select
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500"
+              value={form.contractId}
+                  onChange={(e) => setForm((prev: typeof form) => ({ ...prev, contractId: e.target.value }))}
+              disabled={contractLocked}
+            >
+              <option value="">
+                {loadingContracts ? "Đang tải hợp đồng..." : "-- Chọn hợp đồng --"}
+              </option>
+              {filteredContracts.map((c: LandlordContractWithExtras) => {
+                const cat = translateCategory(roomIdToCategory[c.roomId]);
+                const label = [
+                  `Phòng ${c?.roomInfo?.roomNumber ?? "?"}`,
+                  cat,
+                  c?.roomInfo?.buildingName
+                ]
+                  .filter(Boolean)
+                  .join(" • ");
+                return (
+                  <option key={c.contractId} value={String(c.contractId)}>
+                    {label} ({translateContractStatus(c?.status)})
                   </option>
-                  {filteredContracts.map((c: LandlordContractWithExtras) => {
-                    const cat = translateCategory(roomIdToCategory[c.roomId]);
-                    const label = [
-                      `Phòng ${c?.roomInfo?.roomNumber ?? "?"}`,
-                      cat,
-                      c?.roomInfo?.buildingName
-                    ]
-                      .filter(Boolean)
-                      .join(" • ");
-                    return (
-                      <option key={c.contractId} value={String(c.contractId)}>
-                        {label} ({translateContractStatus(c?.status)})
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">
-                  Nếu không thấy hợp đồng mới, hãy làm mới trang hoặc kiểm tra trạng thái.
-                </p>
-              </div>
-            </div>
-
-            <ContractPreview contract={selectedContract} />
+                );
+              })}
+            </select>
           </div>
         </div>
 
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">Chu kỳ tính tiền</h3>
-          <p className="text-xs text-slate-500">
-            Điền chính xác tháng, năm và hạn thanh toán cho kỳ hoá đơn này.
-          </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tháng</label>
@@ -426,9 +491,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
                 onChange={onChange}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500"
               />
-              <p className="mt-1 text-xs text-slate-500">
-                Nếu để trống, hệ thống mặc định cuối tháng hiện tại.
-              </p>
             </div>
             <label className="mt-6 inline-flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -436,7 +498,7 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                 checked={form.includeRent}
                 onChange={(e) =>
-                  setForm((prev) => ({
+                  setForm((prev: typeof form) => ({
                     ...prev,
                     includeRent: e.target.checked
                   }))
@@ -449,9 +511,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
 
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">Chỉ số tiện ích</h3>
-          <p className="text-xs text-slate-500">
-            Nhập chỉ số đầu và cuối cho điện, nước. Để trống nếu kỳ này không thu.
-          </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -524,9 +583,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Khoản phát sinh khác</h3>
-              <p className="text-xs text-slate-500">
-                Thêm các khoản như vệ sinh, internet, gửi xe... để khách dễ đối soát.
-              </p>
             </div>
             <button
               type="button"
@@ -591,21 +647,6 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
           )}
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">Ghi chú gửi khách thuê</h3>
-          <p className="text-xs text-slate-500">
-            Nội dung này sẽ hiển thị trong email và hoá đơn gửi cho khách.
-          </p>
-          <textarea
-            name="note"
-            value={form.note}
-            onChange={onChange}
-            rows={4}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:border-teal-500"
-            placeholder="Ví dụ: Vui lòng thanh toán trước ngày 25 để tránh phí phạt trễ hạn."
-          />
-        </div>
-
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <FaInfoCircle className="h-4 w-4" />
@@ -630,68 +671,8 @@ export default function ManualInvoiceForm({ onOpenMaintenanceModal }: ManualInvo
       {result && (
         <InvoiceResultCard result={result} translateInvoiceStatus={translateInvoiceStatus} />
       )}
-    </div>
+    </>
   );
-}
-
-function ContractPreview({ contract }: { contract: LandlordContractWithExtras | null | undefined }) {
-  if (!contract) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
-        <p>Chọn hợp đồng để xem nhanh thông tin phòng, khách thuê và trạng thái.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
-        Hợp đồng #{contract.contractId}
-      </p>
-      <div className="space-y-2 text-xs text-slate-600">
-        <PreviewItem label="Khách thuê" value={contract.tenantName || "Không có dữ liệu"} />
-        <PreviewItem
-          label="Phòng"
-          value={`${
-            contract?.roomInfo?.roomNumber ? `Phòng ${contract.roomInfo.roomNumber}` : "Không rõ"
-          }${contract?.roomInfo?.buildingName ? ` • ${contract.roomInfo.buildingName}` : ""}`}
-        />
-        <PreviewItem label="Trạng thái" value={translateStatus(contract?.status)} />
-        {contract?.startDate && (
-          <PreviewItem
-            label="Ngày bắt đầu"
-            value={new Date(contract.startDate).toLocaleDateString("vi-VN")}
-          />
-        )}
-        {contract?.endDate && (
-          <PreviewItem
-            label="Ngày kết thúc"
-            value={new Date(contract.endDate).toLocaleDateString("vi-VN")}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PreviewItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="w-24 shrink-0 text-slate-400">{label}</span>
-      <span className="font-medium text-slate-700">{value}</span>
-    </div>
-  );
-}
-
-function translateStatus(status?: string) {
-  const map: Record<string, string> = {
-    active: "Đang hiệu lực",
-    pending: "Chờ hiệu lực",
-    expired: "Hết hạn",
-    terminated: "Đã kết thúc",
-    cancelled: "Đã hủy"
-  };
-  return map[status ?? ""] || "Không rõ";
 }
 
 function InvoiceResultCard({

@@ -68,4 +68,34 @@ export async function getMaintenanceFeeInvoices(): Promise<MaintenanceFeeInvoice
   return apiGet("landlord/invoices?invoiceType=maintenance_fee");
 }
 
+export interface LandlordInvoice {
+  invoiceId: number;
+  tenantId?: number;
+  landlordId: number;
+  contractId: number;
+  roomId: number;
+  invoiceType: string;
+  amount: number;
+  dueDate: string;
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft';
+  description?: string;
+  createdAt: string;
+  updatedAt?: string;
+  paidDate?: string;
+  paymentMethod?: string;
+  items?: CreatedInvoiceItem[];
+  roomNumber?: string;
+  tenantName?: string;
+  tenantPhone?: string;
+  tenantEmail?: string;
+  buildingName?: string;
+}
+
+/**
+ * Lấy danh sách tất cả hóa đơn của chủ nhà (mọi trạng thái)
+ */
+export async function getLandlordInvoices(): Promise<LandlordInvoice[]> {
+  return apiGet("landlord/invoices");
+}
+
 
