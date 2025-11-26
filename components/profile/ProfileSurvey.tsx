@@ -39,7 +39,22 @@ function FieldBox({ label, children, className = "", required = false }: { label
 }
 
 export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
+  // Tất cả hooks phải được gọi ở top level, trước mọi early return
   const { showSuccess } = useToast();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [data, setData] = useState<UserProfile>({});
+  const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
+  const [preferredWards, setPreferredWards] = useState<string[]>([]);
+  const [wardOptions, setWardOptions] = useState<Ward[]>([]);
+  const [provinceOptions, setProvinceOptions] = useState<{ code: string; name: string }[]>([]);
+  // UX helpers for required hints
+  const [focusedField, setFocusedField] = useState<string>("");
+  // Local user state for registration flow
+  const [localUser, setLocalUser] = useState<User | null>(null);
+  const DRAFT_KEY = `survey_draft_user`;
   
   // Theo tài liệu: landlord không cần profile, chỉ cần verification
   if (role === "landlord") {
@@ -59,20 +74,6 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       </div>
     );
   }
-  const { user } = useAuth();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [data, setData] = useState<UserProfile>({});
-  const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
-  const [preferredWards, setPreferredWards] = useState<string[]>([]);
-  const [wardOptions, setWardOptions] = useState<Ward[]>([]);
-  const [provinceOptions, setProvinceOptions] = useState<{ code: string; name: string }[]>([]);
-  // UX helpers for required hints
-  const [focusedField, setFocusedField] = useState<string>("");
-  // Local user state for registration flow
-  const [localUser, setLocalUser] = useState<User | null>(null);
-  const DRAFT_KEY = `survey_draft_user`;
 
   // helpers
   const toNumber = (v: string): number | undefined => (v === "" ? undefined : Number(v));

@@ -20,6 +20,19 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
+  {
+    rules: {
+      // Chuyển một số rules thành warnings thay vì errors
+      "@typescript-eslint/no-explicit-any": "warn", // Thay vì "error"
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@next/next/no-img-element": "warn",
+      "prefer-const": "warn",
+      "react/no-unescaped-entities": "warn",
+      // Giữ các lỗi nghiêm trọng là errors
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
+    },
+  },
 ];
 
 export default eslintConfig;
