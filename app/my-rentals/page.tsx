@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import MyRentalRequests from "@/components/rental/MyRentalRequests";
@@ -9,7 +9,7 @@ import MySharingRequests from "@/components/room_sharing/MySharingRequests";
 import UserASharingRequests from "@/components/room_sharing/UserASharingRequests";
 import Footer from "@/components/common/Footer";
 
-export default function MyRentalsPage() {
+function MyRentalsContent() {
   const searchParams = useSearchParams();
   const tabParam = searchParams?.get('tab');
   const [activeTab, setActiveTab] = useState<'requests' | 'invoices' | 'my-sharing' | 'pending-sharing'>('requests');
@@ -116,5 +116,20 @@ export default function MyRentalsPage() {
       </div>
       <Footer />
     </div>
+  );
+}
+
+export default function MyRentalsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải...</p>
+        </div>
+      </div>
+    }>
+      <MyRentalsContent />
+    </Suspense>
   );
 }

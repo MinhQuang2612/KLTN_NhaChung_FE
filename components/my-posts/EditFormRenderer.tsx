@@ -10,7 +10,7 @@ interface EditFormRendererProps {
   category: Category;
   formData: any;
   onInputChange: (name: string, value: any) => void;
-  onNumberChange: (name: string, value: string) => void;
+  onNumberChange: (name: string, value: string | number) => void;
 }
 
 export default function EditFormRenderer({

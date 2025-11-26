@@ -323,7 +323,7 @@ const UserASharingRequests: React.FC = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
+                      Phòng #${request.roomId}
                     </h3>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
                       {getStatusText(request.status)}

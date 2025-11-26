@@ -448,7 +448,7 @@ export default function Testimonials(){
                         {it.media.slice(0, 3).map((url, idx) => (
                           <div key={idx} className="relative w-12 h-12 border rounded overflow-hidden">
                             <img src={url} alt="review-media" className="w-full h-full object-cover" />
-                            {idx === 2 && it.media.length > 3 && (
+                            {idx === 2 && it.media && it.media.length > 3 && (
                               <div className="absolute inset-0 bg-black/50 text-white text-[10px] flex items-center justify-center">
                                 +{it.media.length - 3}
                               </div>

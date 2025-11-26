@@ -39,12 +39,12 @@ export default function ReplyForm({
 
   const handleSubmit = async () => {
     if (!user) {
-      showError('Vui lòng đăng nhập để trả lời');
+      showError('Lỗi', 'Vui lòng đăng nhập để trả lời');
       return;
     }
 
     if (content.trim().length === 0) {
-      showError('Vui lòng nhập nội dung phản hồi');
+      showError('Lỗi', 'Vui lòng nhập nội dung phản hồi');
       return;
     }
 
@@ -58,17 +58,17 @@ export default function ReplyForm({
 
       if (editingReply) {
         await updateReply(reviewId, editingReply.replyId, payload);
-        showSuccess('Đã cập nhật phản hồi');
+        showSuccess('Thành công', 'Đã cập nhật phản hồi');
       } else {
         await createReply(reviewId, payload);
-        showSuccess('Đã gửi phản hồi');
+        showSuccess('Thành công', 'Đã gửi phản hồi');
       }
 
       setContent('');
       setMedia([]);
       onReplyCreated();
     } catch (error: any) {
-      showError(error.message || 'Không thể gửi phản hồi');
+      showError('Lỗi', error.message || 'Không thể gửi phản hồi');
     } finally {
       setSubmitting(false);
     }
@@ -80,17 +80,17 @@ export default function ReplyForm({
 
     // Check limit
     if (media.length + files.length > 3) {
-      showError('Chỉ được tải tối đa 3 ảnh');
+      showError('Lỗi', 'Chỉ được tải tối đa 3 ảnh');
       return;
     }
 
     try {
       const uploaded = await uploadFiles(files);
       setMedia(prev => [...prev, ...uploaded]);
-      showSuccess('Đã tải ảnh lên');
+      showSuccess('Thành công', 'Đã tải ảnh lên');
     } catch (err: any) {
       const msg = extractApiErrorMessage(err);
-      showError(msg || 'Không thể tải ảnh lên');
+      showError('Lỗi', msg || 'Không thể tải ảnh lên');
     } finally {
       // Reset input
       e.target.value = '';

@@ -27,7 +27,7 @@ export interface ZaloPayQRData {
 
 export interface PaymentStatus {
   orderId: string;
-  status: 'pending' | 'paid' | 'failed' | 'expired';
+  status: 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
   paidAt?: string;
   paymentMethod?: string;
   errorMessage?: string;

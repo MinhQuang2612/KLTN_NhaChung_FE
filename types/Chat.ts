@@ -31,7 +31,7 @@ export interface Message {
   senderId: number | null; // null cho system message
   senderName?: string;
   senderAvatar?: string;
-  type: 'text' | 'image' | 'file' | 'system';
+  type: 'text' | 'image' | 'video' | 'file' | 'system';
   content: string;
   metadata?: { // Metadata cho system message (thông tin bài đăng)
     postId?: number;
@@ -61,7 +61,7 @@ export interface CreateConversationPayload {
 export interface SendMessagePayload {
   conversationId: number;
   senderId: number;
-  type?: 'text' | 'image' | 'file';
+  type?: 'text' | 'image' | 'video' | 'file';
   content: string;
 }
 

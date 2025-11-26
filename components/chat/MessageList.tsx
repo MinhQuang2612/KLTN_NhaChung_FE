@@ -190,10 +190,10 @@ export default function MessageList({
                 {isSystemPostMessage ? (
                   <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 max-w-md">
                     <div className="flex items-start gap-3">
-                      {message.metadata.postImage && (
+                      {message.metadata?.postImage && (
                         <img
                           src={message.metadata.postImage}
-                          alt={message.metadata.postTitle || 'Bài đăng'}
+                          alt={message.metadata?.postTitle || 'Bài đăng'}
                           className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
                         />
                       )}
@@ -202,30 +202,30 @@ export default function MessageList({
                           <FaInfoCircle className="w-3 h-3" />
                           <span>Quan tâm đến bài đăng</span>
                         </p>
-                        {message.metadata.postTitle && (
+                        {message.metadata?.postTitle && (
                           <p className="text-sm font-semibold text-gray-900 mb-1 truncate">
                             {message.metadata.postTitle}
                           </p>
                         )}
-                        {message.metadata.postPrice && (
+                        {message.metadata?.postPrice && (
                           <p className="text-xs text-gray-700 mb-1 flex items-center gap-1">
                             <FaDollarSign className="w-3 h-3" />
                             <span>{message.metadata.postPrice.toLocaleString('vi-VN')} VNĐ/tháng</span>
                           </p>
                         )}
-                        {message.metadata.postAddress && (
+                        {message.metadata?.postAddress && (
                           <p className="text-xs text-gray-700 mb-2 flex items-center gap-1">
                             <FaMapMarkerAlt className="w-3 h-3 flex-shrink-0" />
                             <span className="line-clamp-2">{message.metadata.postAddress}</span>
                           </p>
                         )}
-                        {message.metadata.roomName && (
+                        {message.metadata?.roomName && (
                           <p className="text-xs text-gray-700 mb-2 flex items-center gap-1">
                             <FaBed className="w-3 h-3" />
                             <span>{message.metadata.roomName}</span>
                           </p>
                         )}
-                        {message.metadata.postUrl && (
+                        {message.metadata?.postUrl && (
                           <a
                             href={message.metadata.postUrl}
                             target="_blank"

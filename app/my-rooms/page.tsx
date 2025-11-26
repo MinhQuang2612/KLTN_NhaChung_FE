@@ -17,8 +17,8 @@ import RoommateRequirementsModal from '@/components/roommate/RoommateRequirement
 import {
   getRoommatePreference,
   updateRoommatePreference,
-  RoommatePreference,
 } from '@/services/roommatePreferences';
+import { RoommatePreference } from '@/types/RoommatePreference';
 import { Requirements } from '@/types/Post';
 import { useRouter } from 'next/navigation';
 import { getMyProfile } from '@/services/userProfiles';

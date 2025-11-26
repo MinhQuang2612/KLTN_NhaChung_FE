@@ -46,7 +46,11 @@ export default function EditRoomPage() {
         ]);
         
         setRoom(roomData);
-        setBuildings(buildingsResponse);
+        // Extract buildings array from response (could be array or object)
+        const buildingsList = Array.isArray(buildingsResponse) 
+          ? buildingsResponse 
+          : buildingsResponse.buildings;
+        setBuildings(buildingsList);
         
         // Load existing rooms in the same building for validation
         if (roomData?.buildingId) {

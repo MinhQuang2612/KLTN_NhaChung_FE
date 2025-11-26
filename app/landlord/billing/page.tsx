@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import ManualInvoiceForm from "@/components/landlord/ManualInvoiceForm";
 import MaintenanceFeePaymentModal from "@/components/landlord/MaintenanceFeePaymentModal";
 import Footer from "@/components/common/Footer";
@@ -17,7 +17,9 @@ export default function BillingPage() {
           <p className="text-gray-600 mt-2">Tạo hóa đơn và xem lịch sử tính tiền</p>
         </div>
 
-        <ManualInvoiceForm onOpenMaintenanceModal={() => setShowMaintenanceModal(true)} />
+        <Suspense fallback={<div className="text-center py-8">Đang tải...</div>}>
+          <ManualInvoiceForm onOpenMaintenanceModal={() => setShowMaintenanceModal(true)} />
+        </Suspense>
       </div>
 
       <MaintenanceFeePaymentModal
