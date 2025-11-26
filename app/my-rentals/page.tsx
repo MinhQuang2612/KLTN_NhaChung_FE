@@ -7,7 +7,6 @@ import MyRentalRequests from "@/components/rental/MyRentalRequests";
 import PendingInvoices from "@/components/payments/PendingInvoices";
 import MySharingRequests from "@/components/room_sharing/MySharingRequests";
 import UserASharingRequests from "@/components/room_sharing/UserASharingRequests";
-import Footer from "@/components/common/Footer";
 
 function MyRentalsContent() {
   const searchParams = useSearchParams();
@@ -55,8 +54,8 @@ function MyRentalsContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Quản lý thuê phòng</h1>
-          <p className="text-gray-600 mt-2">Theo dõi đăng ký thuê, thanh toán và ở ghép của bạn</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý thuê phòng</h1>
+          <p className="text-gray-600">Xem và quản lý các yêu cầu thuê phòng, hóa đơn thanh toán và yêu cầu ở ghép</p>
         </div>
 
         {/* Tabs */}
@@ -114,7 +113,6 @@ function MyRentalsContent() {
           </div>
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

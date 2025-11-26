@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../contexts/AuthContext";
-import Footer from "../../../components/common/Footer";
 import BuildingsContent from "../../../components/landlord/BuildingsContent";
 import BuildingForm from "../../../components/landlord/BuildingForm";
 import { getBuildings, createBuilding, deleteBuilding } from "../../../services/buildings";
@@ -223,8 +222,6 @@ export default function BuildingsPage() {
           </div>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 }

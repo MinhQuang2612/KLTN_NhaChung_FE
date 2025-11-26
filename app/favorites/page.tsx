@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useFavorites } from "../../contexts/FavoritesContext";
-import Footer from "../../components/common/Footer";
 import FavoritesContent from "../../components/favorites/FavoritesContent";
 import { getPosts } from "../../services/posts";
 import { Post } from "../../types/Post";
@@ -184,8 +183,6 @@ export default function FavoritesPage() {
           />
         )}
       </div>
-
-      <Footer />
     </div>
   );
 }

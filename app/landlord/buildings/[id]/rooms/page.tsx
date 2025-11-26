@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import Footer from "@/components/common/Footer";
 import { getRooms, createRoom, deleteRoom, softDeleteRoom, getRoomTenant } from "@/services/rooms";
 import { getBuildingById } from "@/services/buildings";
 import { getPostsByRoom, deletePost } from "@/services/posts";
@@ -433,7 +432,6 @@ export default function BuildingRoomsPage() {
         type={confirm.type}
         loading={confirm.loading}
       />
-      <Footer />
     </div>
   );
 }

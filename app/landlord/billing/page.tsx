@@ -3,7 +3,6 @@
 import { Suspense, useState } from "react";
 import ManualInvoiceForm from "@/components/landlord/ManualInvoiceForm";
 import MaintenanceFeePaymentModal from "@/components/landlord/MaintenanceFeePaymentModal";
-import Footer from "@/components/common/Footer";
 
 export default function BillingPage() {
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
@@ -26,8 +25,6 @@ export default function BillingPage() {
         isOpen={showMaintenanceModal}
         onClose={() => setShowMaintenanceModal(false)}
       />
-
-      <Footer />
     </div>
   );
 }

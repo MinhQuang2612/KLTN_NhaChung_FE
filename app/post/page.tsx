@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import NewPostFlow from '@/components/post/NewPostFlow';
-import Footer from '@/components/common/Footer';
 import { FaHome, FaUsers, FaBolt } from 'react-icons/fa';
 
 export default function PostPage() {
@@ -60,7 +59,6 @@ export default function PostPage() {
             </div>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -133,8 +131,6 @@ export default function PostPage() {
           </div>
         </div>
       </div>
-
-      <Footer />
 
       {/* New Post Flow Modal - chỉ hiển thị cho landlord */}
       {showNewPostFlow && user?.role === 'landlord' && (

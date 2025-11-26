@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../contexts/AuthContext";
-import Footer from "../../components/common/Footer";
 import NotificationModal from "../../components/common/NotificationModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import MyPostsContent from "../../components/my-posts/MyPostsContent";
@@ -195,7 +194,7 @@ export default function MyPostsPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Bài đăng của tôi</h1>
-          <p className="text-gray-600">Quản lý các bài đăng phòng trọ của bạn</p>
+          <p className="text-gray-600">Quản lý các bài đăng tìm phòng và tìm người ở ghép của bạn</p>
         </div>
 
         {loading ? (
@@ -235,7 +234,6 @@ export default function MyPostsPage() {
         )}
       </div>
 
-      <Footer />
       {/* Confirm delete modal - gọn và không chồng nút */}
       <ConfirmModal
         isOpen={confirm.open}

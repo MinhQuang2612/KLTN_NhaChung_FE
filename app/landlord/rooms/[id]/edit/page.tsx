@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "../../../../../contexts/AuthContext";
-import Footer from "../../../../../components/common/Footer";
 import RoomForm from "../../../../../components/landlord/RoomForm";
 import { getRoomById, updateRoom, getRooms } from "../../../../../services/rooms";
 import { getBuildings } from "../../../../../services/buildings";
@@ -189,8 +188,6 @@ export default function EditRoomPage() {
           existingRooms={existingRooms}
         />
       </div>
-
-      <Footer />
     </div>
   );
 }

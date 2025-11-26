@@ -1,6 +1,6 @@
 export default function Footer(){
     return (
-      <footer>
+      <footer className="relative z-10">
         {/* Upper Section - Dark Background */}
         <div className="bg-gray-900 text-white py-8">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">

@@ -269,41 +269,41 @@ export default function MyPostsContent({ posts, onEdit, onView, onDelete, onActi
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 sm:p-6 border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-600 text-sm font-medium">Tổng bài đăng</p>
-              <p className="text-3xl font-bold text-blue-700">{posts.length}</p>
+              <p className="text-blue-600 text-xs sm:text-sm font-medium">Tổng bài đăng</p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-700">{posts.length}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center">
-              <FaClipboardList className="text-2xl text-blue-700" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-200 rounded-lg flex items-center justify-center">
+              <FaClipboardList className="text-xl sm:text-2xl text-blue-700" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 sm:p-6 border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm font-medium">Đang hiển thị</p>
-              <p className="text-3xl font-bold text-green-700">{tabCounts.active}</p>
+              <p className="text-green-600 text-xs sm:text-sm font-medium">Đang hiển thị</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-700">{tabCounts.active}</p>
             </div>
-            <div className="w-12 h-12 bg-green-200 rounded-lg flex items-center justify-center">
-              <FaCheckCircle className="text-2xl text-green-700" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-200 rounded-lg flex items-center justify-center">
+              <FaCheckCircle className="text-xl sm:text-2xl text-green-700" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200">
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 sm:p-6 border border-amber-200 sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-amber-600 text-sm font-medium">Chờ duyệt</p>
-              <p className="text-3xl font-bold text-amber-700">{tabCounts.pending}</p>
+              <p className="text-amber-600 text-xs sm:text-sm font-medium">Chờ duyệt</p>
+              <p className="text-2xl sm:text-3xl font-bold text-amber-700">{tabCounts.pending}</p>
             </div>
-            <div className="w-12 h-12 bg-amber-200 rounded-lg flex items-center justify-center">
-              <FaClock className="text-2xl text-amber-600" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-200 rounded-lg flex items-center justify-center">
+              <FaClock className="text-xl sm:text-2xl text-amber-600" />
             </div>
           </div>
         </div>

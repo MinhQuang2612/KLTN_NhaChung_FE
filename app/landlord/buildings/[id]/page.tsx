@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Footer from "@/components/common/Footer";
 import BuildingDetails from "@/components/landlord/BuildingDetails";
 import RoomCardVertical from "@/components/landlord/RoomCardVertical";
 import RoomCardHorizontal from "@/components/landlord/RoomCardHorizontal";
@@ -405,8 +404,6 @@ export default function BuildingDetailsPage() {
           </div>
         </div>
       )}
-
-      <Footer />
 
       {/* Tenant Info Modal */}
       {showTenantModal && (

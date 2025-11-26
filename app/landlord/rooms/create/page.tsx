@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../../contexts/AuthContext";
-import Footer from "../../../../components/common/Footer";
 import RoomForm from "../../../../components/landlord/RoomForm";
 import { createRoom } from "../../../../services/rooms";
 import { getBuildings } from "../../../../services/buildings";
@@ -147,8 +146,6 @@ export default function CreateRoomPage() {
           loading={loading}
         />
       </div>
-
-      <Footer />
     </div>
   );
 }

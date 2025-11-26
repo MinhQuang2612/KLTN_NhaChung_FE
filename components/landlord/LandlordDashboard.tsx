@@ -6,7 +6,6 @@ import {
   DashboardSummaryResponse
 } from "@/services/landlordDashboard";
 import { useAuth } from "@/contexts/AuthContext";
-import Footer from "@/components/common/Footer";
 import {
   FaClipboardList,
   FaFileAlt,
@@ -286,7 +285,6 @@ export default function LandlordDashboard() {
           </div>
         )}
       </div>
-      <Footer />
     </>
   );
 }

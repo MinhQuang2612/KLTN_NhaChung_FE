@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { updateUserProfile, updateUserAvatar } from "../../services/user";
-import Footer from "../../components/common/Footer";
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import ProfileForm from "../../components/profile/ProfileForm";
 import AccountSettings from "../../components/profile/AccountSettings";
@@ -131,7 +130,7 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Thông tin cá nhân</h1>
-          <p className="text-gray-600">Quản lý thông tin tài khoản của bạn</p>
+          <p className="text-gray-600">Cập nhật thông tin cá nhân và xác thực tài khoản của bạn</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -158,8 +157,6 @@ export default function ProfilePage() {
           />
         </div>
       </div>
-
-      <Footer />
     </div>
   );
 }

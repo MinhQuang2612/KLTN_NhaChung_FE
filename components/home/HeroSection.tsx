@@ -21,7 +21,7 @@ export default function HeroSection() {
 
       {/* Main content */}
       <div className="mx-auto max-w-7xl px-6 lg:px-8 w-full">
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 mt-8 md:mt-0">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-white mb-2">
             "Tìm chỗ ở,
           </h1>
