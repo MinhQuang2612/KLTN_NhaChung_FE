@@ -1,0 +1,469 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { 
+  getSharingRequestsToApprove, 
+  getSharingRequestsHistory,
+  approveSharingRequestByUser, 
+  rejectSharingRequestByUser,
+  RoomSharingRequest 
+} from '@/services/roomSharing';
+import { getRoomById } from '@/services/rooms';
+import { addressService } from '@/services/address';
+import { getUserRentalRequests } from '@/services/rentalRequests';
+import { getLandlordRentalRequests } from '@/services/landlord';
+import { getUserById } from '@/services/user';
+import { getUserVerification } from '@/services/verification';
+import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { ToastMessages } from '@/utils/toastMessages';
+
+const UserASharingRequests: React.FC = () => {
+  const [requests, setRequests] = useState<RoomSharingRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
+
+  const loadRequests = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Gọi cả 2 API: requests đang chờ duyệt và lịch sử đã duyệt
+      const [pendingRequests, historyRequests] = await Promise.all([
+        getSharingRequestsToApprove(),
+        getSharingRequestsHistory()
+      ]);
+      
+      // Kết hợp cả 2 danh sách
+      const allRequests = [...(pendingRequests || []), ...(historyRequests || [])];
+
+      // Augment thông tin phòng nếu có thể
+      const roomIdToInfo: Record<number, { roomNumber?: string; buildingName?: string; address?: string; category?: string }> = {};
+      const uniqueRoomIds = Array.from(new Set(allRequests.map(r => r.roomId).filter(Boolean)));
+      await Promise.all(uniqueRoomIds.map(async (roomId) => {
+        try {
+          const room = await getRoomById(Number(roomId));
+          const formattedAddress = room?.address ? addressService.formatAddressForDisplay(room.address as any) : undefined;
+          roomIdToInfo[Number(roomId)] = {
+            roomNumber: (room as any)?.roomNumber,
+            buildingName: (room as any)?.building?.name,
+            address: formattedAddress,
+            category: (room as any)?.category
+          };
+        } catch {}
+      }));
+
+      // Augment thông tin người gửi yêu cầu (tenant/seeker)
+      const tenantIdToInfo: Record<number, { name?: string; age?: number; gender?: string; occupation?: string; phone?: string }> = {};
+      const uniqueTenantIds = Array.from(new Set(allRequests.map(r => r.tenantId).filter(Boolean)));
+      await Promise.all(uniqueTenantIds.map(async (tenantId) => {
+        try {
+          const tenant = await getUserById(Number(tenantId));
+          
+          // Lấy thông tin từ user
+          let name = (tenant as any)?.fullName || (tenant as any)?.name || 'N/A';
+          let phone = (tenant as any)?.phone || (tenant as any)?.phoneNumber;
+          let occupation = (tenant as any)?.occupation;
+          let age: number | undefined;
+          let gender: string | undefined;
+          
+          // Lấy từ verification (có dateOfBirth và gender)
+          try {
+            const verificationResponse = await getUserVerification(Number(tenantId));
+            if (verificationResponse) {
+              // Xử lý nhiều cấu trúc response có thể có
+              const verification = verificationResponse.verification || verificationResponse.data || verificationResponse;
+              
+              // Lấy gender từ verification (có thể ở nhiều level)
+              if (verification.gender) {
+                gender = verification.gender;
+              } else if (verificationResponse.gender) {
+                gender = verificationResponse.gender;
+              }
+              
+              // Tính age từ dateOfBirth trong verification
+              const dateOfBirth = verification.dateOfBirth || verificationResponse.dateOfBirth;
+              if (dateOfBirth) {
+                try {
+                  const dob = new Date(dateOfBirth);
+                  if (!isNaN(dob.getTime())) {
+                    const today = new Date();
+                    age = today.getFullYear() - dob.getFullYear();
+                    const monthDiff = today.getMonth() - dob.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                      age--;
+                    }
+                  }
+                } catch (e) {
+                  // Silently fail if age calculation fails
+                }
+              }
+            }
+          } catch (error) {
+            // Silently fail if verification fetch fails
+          }
+          
+          // Fallback: Lấy từ user nếu không có verification
+          if (!age && ((tenant as any)?.age || (tenant as any)?.userAge)) {
+            age = (tenant as any)?.age || (tenant as any)?.userAge;
+          }
+          if (!age && (tenant as any)?.dateOfBirth) {
+            try {
+              const dob = new Date((tenant as any).dateOfBirth);
+              if (!isNaN(dob.getTime())) {
+                const today = new Date();
+                age = today.getFullYear() - dob.getFullYear();
+                const monthDiff = today.getMonth() - dob.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                  age--;
+                }
+              }
+            } catch {}
+          }
+          
+          if (!gender && ((tenant as any)?.gender || (tenant as any)?.userGender)) {
+            gender = (tenant as any)?.gender || (tenant as any)?.userGender;
+          }
+          
+          // Thử lấy occupation từ profile nếu chưa có
+          if (!occupation) {
+            try {
+              const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user-profiles/${tenantId}`, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                },
+              });
+              if (profileResponse.ok) {
+                const profile = await profileResponse.json();
+                if ((profile as any)?.occupation) {
+                  occupation = (profile as any).occupation;
+                }
+              }
+            } catch {}
+          }
+          
+          tenantIdToInfo[Number(tenantId)] = {
+            name,
+            age,
+            gender,
+            occupation,
+            phone,
+          };
+        } catch {}
+      }));
+
+      const augmented = allRequests.map(r => ({
+        ...r,
+        roomNumber: roomIdToInfo[r.roomId]?.roomNumber,
+        buildingName: roomIdToInfo[r.roomId]?.buildingName,
+        address: roomIdToInfo[r.roomId]?.address,
+        roomCategory: roomIdToInfo[r.roomId]?.category,
+        senderName: tenantIdToInfo[r.tenantId]?.name,
+        senderAge: tenantIdToInfo[r.tenantId]?.age,
+        senderGender: tenantIdToInfo[r.tenantId]?.gender,
+        senderOccupation: tenantIdToInfo[r.tenantId]?.occupation,
+        senderPhone: tenantIdToInfo[r.tenantId]?.phone,
+      })) as any;
+
+      setRequests(augmented);
+    } catch (err: any) {
+      setError('Không thể tải danh sách yêu cầu ở ghép. Vui lòng thử lại sau.');
+      const message = ToastMessages.error.load('Danh sách yêu cầu ở ghép');
+      showError(message.title, err.message || message.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRequests();
+  }, []);
+
+  const handleApprove = async (requestId: number) => {
+    try {
+      await approveSharingRequestByUser(requestId);
+      
+      const successMessage = ToastMessages.success.update('Yêu cầu ở ghép');
+      showSuccess(successMessage.title, 'Đã duyệt yêu cầu ở ghép! Chờ chủ nhà duyệt cuối cùng.');
+      
+      loadRequests(); // Refresh list
+    } catch (error: any) {
+      const errorMessage = ToastMessages.error.update('Yêu cầu ở ghép');
+      showError(errorMessage.title, error.message || errorMessage.message);
+    }
+  };
+
+  const handleReject = async (requestId: number) => {
+    try {
+      await rejectSharingRequestByUser(requestId);
+      
+      const successMessage = ToastMessages.success.update('Yêu cầu ở ghép');
+      showSuccess(successMessage.title, 'Đã từ chối yêu cầu ở ghép.');
+      
+      loadRequests(); // Refresh list
+    } catch (error: any) {
+      const errorMessage = ToastMessages.error.update('Yêu cầu ở ghép');
+      showError(errorMessage.title, error.message || errorMessage.message);
+    }
+  };
+
+  const getStatusText = (status: string): string => {
+    switch (status) {
+      case 'pending_user_approval': return 'Chờ tôi duyệt';
+      case 'pending_landlord_approval': return 'Chờ chủ nhà duyệt';
+      case 'approved': return 'Đã duyệt';
+      case 'rejected': return 'Đã từ chối';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'pending_user_approval': return 'bg-yellow-100 text-yellow-800';
+      case 'pending_landlord_approval': return 'bg-blue-100 text-blue-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatRoomCategory = (category?: string) => {
+    if (!category) return undefined;
+    const map: Record<string, string> = {
+      'phong-tro': 'Phòng trọ',
+      'chung-cu': 'Chung cư',
+      'nha-nguyen-can': 'Nhà nguyên căn',
+    };
+    return map[category] || category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  const formatOccupation = (occupation?: string) => {
+    if (!occupation) return undefined;
+    const occupationMap: Record<string, string> = {
+      'student': 'Sinh viên',
+      'teacher': 'Giáo viên',
+      'engineer': 'Kỹ sư',
+      'doctor': 'Bác sĩ',
+      'nurse': 'Y tá',
+      'lawyer': 'Luật sư',
+      'accountant': 'Kế toán',
+      'designer': 'Thiết kế',
+      'developer': 'Lập trình viên',
+      'manager': 'Quản lý',
+      'employee': 'Nhân viên',
+      'freelancer': 'Tự do',
+      'business': 'Kinh doanh',
+      'worker': 'Công nhân',
+      'driver': 'Tài xế',
+      'chef': 'Đầu bếp',
+      'waiter': 'Phục vụ',
+      'security': 'Bảo vệ',
+      'cleaner': 'Lao công',
+      'retired': 'Đã nghỉ hưu',
+      'unemployed': 'Chưa có việc',
+    };
+    const lowerOccupation = occupation.toLowerCase().trim();
+    return occupationMap[lowerOccupation] || occupation;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[300px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải yêu cầu ở ghép...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-[300px] flex items-center justify-center">
+        <div className="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+          <p className="text-red-700 font-medium mb-3">{error}</p>
+          <button
+            onClick={loadRequests}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {requests.length === 0 ? (
+        <div className="min-h-[300px] flex items-center justify-center">
+          <div className="text-center p-6 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Không có yêu cầu nào</h3>
+            <p className="text-gray-600">Hiện tại không có yêu cầu ở ghép nào cần duyệt hoặc đã duyệt.</p>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {requests.map((request, index) => (
+            <div 
+              key={request.requestId} 
+              className={`py-5 px-4 ${index !== requests.length - 1 ? 'border-b border-gray-200' : ''} hover:bg-gray-50/50 transition-colors`}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {request.roomNumber ? `Phòng ${request.roomNumber}` : `Phòng #${request.roomId}`}
+                    </h3>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
+                      {getStatusText(request.status)}
+                    </span>
+                  </div>
+                  {(request as any).buildingName || (request as any).address ? (
+                    <p className="text-sm text-gray-600">
+                      {(request as any).buildingName && <span className="font-medium">{(request as any).buildingName}</span>}
+                      {(request as any).buildingName && (request as any).address && <span> • </span>}
+                      {(request as any).address}
+                    </p>
+                  ) : null}
+                </div>
+                {request.status === 'pending_user_approval' && (
+                  <div className="flex gap-2 ml-4">
+                    <button 
+                      onClick={() => handleReject(request.requestId)}
+                      className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                    >
+                      Từ chối
+                    </button>
+                    <button 
+                      onClick={() => handleApprove(request.requestId)}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm"
+                    >
+                      Duyệt
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Loại phòng:</span>
+                  <span className="text-sm font-medium text-gray-900">{formatRoomCategory((request as any).roomCategory) || 'N/A'}</span>
+                </div>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Ngày dọn vào:</span>
+                  <span className="text-sm font-medium text-gray-900">{new Date(request.requestedMoveInDate).toLocaleDateString('vi-VN')}</span>
+                </div>
+                <span className="text-gray-300">|</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Thời hạn:</span>
+                  <span className="text-sm font-medium text-gray-900">{request.requestedDuration} tháng</span>
+                </div>
+              </div>
+
+              {/* Thông tin người gửi yêu cầu */}
+              {(request as any).senderName && (
+                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <h4 className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Thông tin người gửi yêu cầu
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-800">Tên:</span>
+                      <span className="font-medium text-blue-900">{(request as any).senderName}</span>
+                    </div>
+                    {(request as any).senderAge && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-800">Tuổi:</span>
+                          <span className="font-medium text-blue-900">{(request as any).senderAge} tuổi</span>
+                        </div>
+                      </>
+                    )}
+                    {(request as any).senderGender && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-800">Giới tính:</span>
+                          <span className="font-medium text-blue-900">
+                            {(request as any).senderGender === 'male' ? 'Nam' : 
+                             (request as any).senderGender === 'female' ? 'Nữ' : 'Khác'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {(request as any).senderPhone && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-800">Số điện thoại:</span>
+                          <span className="font-medium text-blue-900">{(request as any).senderPhone}</span>
+                        </div>
+                      </>
+                    )}
+                    {(request as any).senderOccupation && (
+                      <>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-800">Nghề nghiệp:</span>
+                          <span className="font-medium text-blue-900">{formatOccupation((request as any).senderOccupation)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {request.message && (
+                    <div className="mt-2 pt-2 border-t border-blue-200">
+                      <p className="text-sm font-bold text-blue-900 mb-1">Tin nhắn:</p>
+                      <p className="text-sm text-blue-800">{request.message}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-2">
+                <p className="text-xs text-gray-500">
+                  Tạo lúc: {new Date(request.createdAt).toLocaleString('vi-VN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                  {request.status === 'pending_user_approval' && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-yellow-700">Đang chờ bạn xác nhận</span>
+                    </>
+                  )}
+                  {request.status === 'pending_landlord_approval' && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-blue-700">Đã chuyển cho chủ nhà duyệt</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserASharingRequests;
