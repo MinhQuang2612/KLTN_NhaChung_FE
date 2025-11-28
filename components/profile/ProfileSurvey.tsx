@@ -385,21 +385,34 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       }
       
       const submitProfile = async () => {
-        if (isRegistrationFlow) {
-          try {
-            await createProfilePublic(payload);
-          } catch (publicError: any) {
-            if (parsedRegistration?.email) {
-              await createProfilePublicFallback({ ...payload, email: parsedRegistration.email });
-            } else {
-              throw publicError;
-            }
-          }
-        } else {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const hasAuthToken = !!token;
+        
+        if (hasAuthToken) {
           try {
             await createProfile(payload);
-          } catch (createError) {
-            await updateMyProfile(payload);
+            return;
+          } catch (createError: any) {
+            if (createError?.status === 409) {
+              await updateMyProfile(payload);
+              return;
+            }
+            if (createError?.status !== 401) {
+              throw createError;
+            }
+          }
+        }
+        
+        try {
+          await createProfilePublic(payload);
+        } catch (publicError: any) {
+          if (publicError?.status === 409) {
+            throw new Error("Hồ sơ đã tồn tại. Vui lòng đăng nhập lại để cập nhật.");
+          }
+          if (parsedRegistration?.email) {
+            await createProfilePublicFallback({ ...payload, email: parsedRegistration.email });
+          } else {
+            throw publicError;
           }
         }
       };
