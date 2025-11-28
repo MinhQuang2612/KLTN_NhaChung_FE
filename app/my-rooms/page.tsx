@@ -158,20 +158,37 @@ const MyRoomsPage = () => {
     }
   };
 
-  const handleSaveRequirements = async (requirements: Requirements, posterTraits: string[]) => {
+  const handleSaveRequirements = async (
+    requirements: Requirements, 
+    posterTraits: string[],
+    posterSmoking?: 'smoker' | 'non_smoker',
+    posterPets?: 'has_pets' | 'no_pets'
+  ) => {
     if (!currentRoomId) return;
 
     try {
-      // ⭐ Gửi cả requirements và posterTraits
+      // Kiểm tra xem đã có preference chưa (tạo mới hay chỉnh sửa)
+      const existingPreference = roommatePreferences[currentRoomId];
+      const isEditing = existingPreference?.enabled && existingPreference?.postId !== null;
+
+      // ⭐ Gửi cả requirements, posterTraits, posterSmoking và posterPets
       await updateRoommatePreference(currentRoomId, {
         enabled: true,
         requirements,
         posterTraits: posterTraits || [], // ⭐ Traits của Poster (User A)
+        posterSmoking, // ⭐ Mới
+        posterPets, // ⭐ Mới
       });
       await loadRoommatePreference(currentRoomId);
       setShowRequirementsModal(false);
       setCurrentRoomId(null);
-      showSuccess('Đã tạo bài đăng tìm ở ghép', 'Bài đăng đang chờ duyệt.');
+      
+      // Phân biệt thông báo: chỉnh sửa hay tạo mới
+      if (isEditing) {
+        showSuccess('Chỉnh sửa yêu cầu thành công', 'Yêu cầu của bạn đã được cập nhật.');
+      } else {
+        showSuccess('Đã tạo bài đăng tìm ở ghép', 'Bài đăng đang chờ duyệt.');
+      }
     } catch (error: any) {
       const message = extractApiErrorMessage(error);
       showError('Không thể tạo bài đăng', message);
@@ -769,8 +786,18 @@ const MyRoomsPage = () => {
             currentRoomId ? roommatePreferences[currentRoomId]?.requirements || null : null
           }
           initialPosterTraits={
-            // ⭐ Lấy posterTraits từ profile.habits (nếu có) hoặc để trống
-            Array.isArray((profile as any)?.habits) ? (profile as any).habits : []
+            // ⭐ Lấy posterTraits từ roommatePreferences (ưu tiên) hoặc profile.habits (fallback)
+            currentRoomId && roommatePreferences[currentRoomId]?.posterTraits
+              ? roommatePreferences[currentRoomId].posterTraits
+              : Array.isArray((profile as any)?.habits) 
+                ? (profile as any).habits 
+                : []
+          }
+          initialPosterSmoking={
+            currentRoomId ? roommatePreferences[currentRoomId]?.posterSmoking || null : null
+          }
+          initialPosterPets={
+            currentRoomId ? roommatePreferences[currentRoomId]?.posterPets || null : null
           }
           posterAge={currentRoomId ? roommatePreferences[currentRoomId]?.posterAge || null : null}
           posterGender={currentRoomId ? roommatePreferences[currentRoomId]?.posterGender || null : null}

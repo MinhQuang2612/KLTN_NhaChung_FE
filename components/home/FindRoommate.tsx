@@ -147,7 +147,9 @@ export default function FindRoommate() {
 
   const handleFindRoommate = async (
     requirements: Requirements,
-    seekerTraits: string[] // ❌ KHÔNG CẦN personalInfo NỮA - Backend tự động lấy age và gender từ verification
+    seekerTraits: string[], // ❌ KHÔNG CẦN personalInfo NỮA - Backend tự động lấy age và gender từ verification
+    seekerSmoking?: 'smoker' | 'non_smoker',
+    seekerPets?: 'has_pets' | 'no_pets'
   ) => {
     // Kiểm tra xác thực tài khoản
     if (!user?.isVerified) {
@@ -167,6 +169,8 @@ export default function FindRoommate() {
         gender: requirements.gender,
         traits: seekerTraits || [],
         maxPrice: requirements.maxPrice,
+        smokingPreference: requirements.smokingPreference || 'any', // ⭐ Mới
+        petsPreference: requirements.petsPreference || 'any', // ⭐ Mới
         personalInfo: {
           fullName: (user as any)?.fullName || (user as any)?.name || (profile as any)?.fullName || '',
           // ❌ KHÔNG GỬI age và gender - Backend tự động lấy từ verification
@@ -174,6 +178,8 @@ export default function FindRoommate() {
           hobbies: Array.isArray((profile as any)?.hobbies) ? (profile as any).hobbies : [],
           lifestyle: (profile as any)?.lifestyle || 'normal',
           cleanliness: (profile as any)?.cleanliness || 'normal',
+          smoking: seekerSmoking, // ⭐ Mới
+          pets: seekerPets, // ⭐ Mới
         },
       };
 
@@ -312,6 +318,8 @@ export default function FindRoommate() {
           onSave={handleFindRoommate}
           initialRequirements={lastRequirements || seekerPreferences?.requirements as Requirements || null}
           initialSeekerTraits={seekerPreferences?.seekerTraits || null}
+          initialSeekerSmoking={seekerPreferences?.seekerSmoking || null}
+          initialSeekerPets={seekerPreferences?.seekerPets || null}
           seekerAge={seekerPreferences?.seekerAge || null}
           seekerGender={seekerPreferences?.seekerGender || null}
           loading={loading}

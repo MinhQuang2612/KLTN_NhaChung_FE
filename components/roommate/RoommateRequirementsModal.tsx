@@ -6,9 +6,16 @@ import { Requirements } from '@/types/Post';
 export interface RoommateRequirementsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (requirements: Requirements, posterTraits: string[]) => void; // ⭐ Thêm posterTraits
+  onSave: (
+    requirements: Requirements, 
+    posterTraits: string[],
+    posterSmoking?: 'smoker' | 'non_smoker',
+    posterPets?: 'has_pets' | 'no_pets'
+  ) => void; // ⭐ Thêm posterSmoking và posterPets
   initialRequirements?: Requirements | null;
   initialPosterTraits?: string[] | null; // ⭐ Traits của Poster (User A)
+  initialPosterSmoking?: 'smoker' | 'non_smoker' | null; // ⭐ Mới
+  initialPosterPets?: 'has_pets' | 'no_pets' | null; // ⭐ Mới
   posterAge?: number | null; // ⭐ Tuổi của Poster từ verification (read-only)
   posterGender?: string | null; // ⭐ Giới tính của Poster từ verification (read-only)
   loading?: boolean;
@@ -28,6 +35,8 @@ export default function RoommateRequirementsModal({
   onSave,
   initialRequirements,
   initialPosterTraits,
+  initialPosterSmoking,
+  initialPosterPets,
   posterAge,
   posterGender,
   loading = false,
@@ -37,10 +46,20 @@ export default function RoommateRequirementsModal({
     gender: initialRequirements?.gender || 'any',
     traits: initialRequirements?.traits || [], // Yêu cầu về traits của người ở ghép
     maxPrice: initialRequirements?.maxPrice || 3000000,
+    smokingPreference: initialRequirements?.smokingPreference || 'any', // ⭐ Mới
+    petsPreference: initialRequirements?.petsPreference || 'any', // ⭐ Mới
   });
 
   const [posterTraits, setPosterTraits] = useState<string[]>(
     initialPosterTraits || [] // ⭐ Traits của Poster (User A)
+  );
+
+  const [posterSmoking, setPosterSmoking] = useState<'smoker' | 'non_smoker' | undefined>(
+    initialPosterSmoking || undefined // ⭐ Mới
+  );
+
+  const [posterPets, setPosterPets] = useState<'has_pets' | 'no_pets' | undefined>(
+    initialPosterPets || undefined // ⭐ Mới
   );
 
   useEffect(() => {
@@ -50,16 +69,24 @@ export default function RoommateRequirementsModal({
         gender: initialRequirements.gender || 'any',
         traits: initialRequirements.traits || [],
         maxPrice: initialRequirements.maxPrice || 3000000,
+        smokingPreference: initialRequirements.smokingPreference || 'any',
+        petsPreference: initialRequirements.petsPreference || 'any',
       });
     }
     if (initialPosterTraits) {
       setPosterTraits(initialPosterTraits);
     }
-  }, [initialRequirements, initialPosterTraits]);
+    if (initialPosterSmoking !== undefined) {
+      setPosterSmoking(initialPosterSmoking);
+    }
+    if (initialPosterPets !== undefined) {
+      setPosterPets(initialPosterPets);
+    }
+  }, [initialRequirements, initialPosterTraits, initialPosterSmoking, initialPosterPets]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData, posterTraits); // ⭐ Gửi cả requirements và posterTraits
+    onSave(formData, posterTraits, posterSmoking, posterPets); // ⭐ Gửi cả requirements, posterTraits, posterSmoking và posterPets
   };
 
   const getGenderDisplay = (gender?: string | null): string => {
@@ -231,6 +258,48 @@ export default function RoommateRequirementsModal({
                     required
                   />
                 </div>
+
+                {/* Hút thuốc - Yêu cầu */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hút thuốc
+                  </label>
+                  <select
+                    value={formData.smokingPreference || 'any'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        smokingPreference: e.target.value as 'smoker' | 'non_smoker' | 'any',
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="any">Không quan trọng</option>
+                    <option value="non_smoker">Không hút thuốc</option>
+                    <option value="smoker">Hút thuốc</option>
+                  </select>
+                </div>
+
+                {/* Thú cưng - Yêu cầu */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Thú cưng
+                  </label>
+                  <select
+                    value={formData.petsPreference || 'any'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        petsPreference: e.target.value as 'has_pets' | 'no_pets' | 'any',
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="any">Không quan trọng</option>
+                    <option value="no_pets">Không có thú cưng</option>
+                    <option value="has_pets">Có thú cưng</option>
+                  </select>
+                </div>
               </div>
 
               {/* Cột phải: Đặc điểm của bạn */}
@@ -306,6 +375,38 @@ export default function RoommateRequirementsModal({
                       Vui lòng chọn ít nhất một đặc điểm
                     </p>
                   )}
+                </div>
+
+                {/* Hút thuốc - Thông tin của bạn */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bạn có hút thuốc không?
+                  </label>
+                  <select
+                    value={posterSmoking || ''}
+                    onChange={(e) => setPosterSmoking(e.target.value as 'smoker' | 'non_smoker' | undefined)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">Chọn</option>
+                    <option value="non_smoker">Không</option>
+                    <option value="smoker">Có</option>
+                  </select>
+                </div>
+
+                {/* Thú cưng - Thông tin của bạn */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bạn có nuôi thú cưng không?
+                  </label>
+                  <select
+                    value={posterPets || ''}
+                    onChange={(e) => setPosterPets(e.target.value as 'has_pets' | 'no_pets' | undefined)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">Chọn</option>
+                    <option value="no_pets">Không</option>
+                    <option value="has_pets">Có</option>
+                  </select>
                 </div>
               </div>
             </div>

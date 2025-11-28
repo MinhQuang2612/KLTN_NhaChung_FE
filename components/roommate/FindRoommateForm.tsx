@@ -11,11 +11,15 @@ export interface FindRoommateFormProps {
   onClose: () => void;
   onSave: (
     requirements: Requirements,
-    seekerTraits: string[] // ⭐ Traits của Seeker (User B)
+    seekerTraits: string[], // ⭐ Traits của Seeker (User B)
+    seekerSmoking?: 'smoker' | 'non_smoker', // ⭐ Mới
+    seekerPets?: 'has_pets' | 'no_pets' // ⭐ Mới
     // ❌ KHÔNG CẦN personalInfo NỮA - Backend tự động lấy age và gender từ verification
   ) => void;
   initialRequirements?: Requirements | null;
   initialSeekerTraits?: string[] | null; // ⭐ Traits của Seeker đã lưu
+  initialSeekerSmoking?: 'smoker' | 'non_smoker' | null; // ⭐ Mới
+  initialSeekerPets?: 'has_pets' | 'no_pets' | null; // ⭐ Mới
   seekerAge?: number | null; // ⭐ Tuổi từ preferences (read-only)
   seekerGender?: string | null; // ⭐ Giới tính từ preferences (read-only)
   loading?: boolean;
@@ -35,6 +39,8 @@ export default function FindRoommateForm({
   onSave,
   initialRequirements,
   initialSeekerTraits,
+  initialSeekerSmoking,
+  initialSeekerPets,
   seekerAge,
   seekerGender,
   loading = false,
@@ -48,10 +54,20 @@ export default function FindRoommateForm({
     gender: initialRequirements?.gender || 'any',
     traits: initialRequirements?.traits || [], // Yêu cầu về traits của người ở ghép
     maxPrice: initialRequirements?.maxPrice || 3000000,
+    smokingPreference: initialRequirements?.smokingPreference || 'any', // ⭐ Mới
+    petsPreference: initialRequirements?.petsPreference || 'any', // ⭐ Mới
   });
 
   const [seekerTraits, setSeekerTraits] = useState<string[]>(
     initialSeekerTraits || [] // ⭐ Traits của Seeker (User B)
+  );
+
+  const [seekerSmoking, setSeekerSmoking] = useState<'smoker' | 'non_smoker' | undefined>(
+    initialSeekerSmoking || undefined // ⭐ Mới
+  );
+
+  const [seekerPets, setSeekerPets] = useState<'has_pets' | 'no_pets' | undefined>(
+    initialSeekerPets || undefined // ⭐ Mới
   );
 
   useEffect(() => {
@@ -61,12 +77,20 @@ export default function FindRoommateForm({
         gender: initialRequirements.gender || 'any',
         traits: initialRequirements.traits || [],
         maxPrice: initialRequirements.maxPrice || 3000000,
+        smokingPreference: initialRequirements.smokingPreference || 'any',
+        petsPreference: initialRequirements.petsPreference || 'any',
       });
     }
     if (initialSeekerTraits) {
       setSeekerTraits(initialSeekerTraits);
     }
-  }, [initialRequirements, initialSeekerTraits]);
+    if (initialSeekerSmoking !== undefined) {
+      setSeekerSmoking(initialSeekerSmoking);
+    }
+    if (initialSeekerPets !== undefined) {
+      setSeekerPets(initialSeekerPets);
+    }
+  }, [initialRequirements, initialSeekerTraits, initialSeekerSmoking, initialSeekerPets]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +103,7 @@ export default function FindRoommateForm({
     }
     
     // ❌ KHÔNG GỬI personalInfo NỮA - Backend tự động lấy age và gender từ verification
-    onSave(requirements, seekerTraits);
+    onSave(requirements, seekerTraits, seekerSmoking, seekerPets);
   };
 
   const getGenderDisplay = (gender?: string | null): string => {
@@ -199,6 +223,38 @@ export default function FindRoommateForm({
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* Hút thuốc - Thông tin của bạn */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bạn có hút thuốc không?
+                  </label>
+                  <select
+                    value={seekerSmoking || ''}
+                    onChange={(e) => setSeekerSmoking(e.target.value as 'smoker' | 'non_smoker' | undefined)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">Chọn</option>
+                    <option value="non_smoker">Không</option>
+                    <option value="smoker">Có</option>
+                  </select>
+                </div>
+
+                {/* Thú cưng - Thông tin của bạn */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bạn có nuôi thú cưng không?
+                  </label>
+                  <select
+                    value={seekerPets || ''}
+                    onChange={(e) => setSeekerPets(e.target.value as 'has_pets' | 'no_pets' | undefined)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">Chọn</option>
+                    <option value="no_pets">Không</option>
+                    <option value="has_pets">Có</option>
+                  </select>
                 </div>
               </div>
 
@@ -322,6 +378,48 @@ export default function FindRoommateForm({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                     required
                   />
+                </div>
+
+                {/* Hút thuốc - Yêu cầu */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hút thuốc
+                  </label>
+                  <select
+                    value={requirements.smokingPreference || 'any'}
+                    onChange={(e) =>
+                      setRequirements({
+                        ...requirements,
+                        smokingPreference: e.target.value as 'smoker' | 'non_smoker' | 'any',
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="any">Không quan trọng</option>
+                    <option value="non_smoker">Không hút thuốc</option>
+                    <option value="smoker">Hút thuốc</option>
+                  </select>
+                </div>
+
+                {/* Thú cưng - Yêu cầu */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Thú cưng
+                  </label>
+                  <select
+                    value={requirements.petsPreference || 'any'}
+                    onChange={(e) =>
+                      setRequirements({
+                        ...requirements,
+                        petsPreference: e.target.value as 'has_pets' | 'no_pets' | 'any',
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="any">Không quan trọng</option>
+                    <option value="no_pets">Không có thú cưng</option>
+                    <option value="has_pets">Có thú cưng</option>
+                  </select>
                 </div>
               </div>
             </div>

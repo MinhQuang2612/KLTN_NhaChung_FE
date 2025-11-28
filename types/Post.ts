@@ -22,6 +22,8 @@ export interface Requirements {
   gender: 'male' | 'female' | 'any';
   traits: string[];
   maxPrice: number;
+  smokingPreference?: 'smoker' | 'non_smoker' | 'any';  // ⭐ Mới
+  petsPreference?: 'has_pets' | 'no_pets' | 'any';      // ⭐ Mới
 }
 
 export interface RoomInfo {
