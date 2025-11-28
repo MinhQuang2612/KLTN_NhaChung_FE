@@ -55,11 +55,11 @@ export default function RoommateRequirementsModal({
   );
 
   const [posterSmoking, setPosterSmoking] = useState<'smoker' | 'non_smoker' | undefined>(
-    initialPosterSmoking || undefined // ⭐ Mới
+    initialPosterSmoking ?? undefined // ⭐ Mới - dùng ?? để xử lý null
   );
 
   const [posterPets, setPosterPets] = useState<'has_pets' | 'no_pets' | undefined>(
-    initialPosterPets || undefined // ⭐ Mới
+    initialPosterPets ?? undefined // ⭐ Mới - dùng ?? để xử lý null
   );
 
   useEffect(() => {
@@ -76,11 +76,15 @@ export default function RoommateRequirementsModal({
     if (initialPosterTraits) {
       setPosterTraits(initialPosterTraits);
     }
-    if (initialPosterSmoking !== undefined) {
+    if (initialPosterSmoking !== undefined && initialPosterSmoking !== null) {
       setPosterSmoking(initialPosterSmoking);
+    } else {
+      setPosterSmoking(undefined);
     }
-    if (initialPosterPets !== undefined) {
+    if (initialPosterPets !== undefined && initialPosterPets !== null) {
       setPosterPets(initialPosterPets);
+    } else {
+      setPosterPets(undefined);
     }
   }, [initialRequirements, initialPosterTraits, initialPosterSmoking, initialPosterPets]);
 

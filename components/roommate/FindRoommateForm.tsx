@@ -63,11 +63,11 @@ export default function FindRoommateForm({
   );
 
   const [seekerSmoking, setSeekerSmoking] = useState<'smoker' | 'non_smoker' | undefined>(
-    initialSeekerSmoking || undefined // ⭐ Mới
+    initialSeekerSmoking ?? undefined // ⭐ Mới - dùng ?? để xử lý null
   );
 
   const [seekerPets, setSeekerPets] = useState<'has_pets' | 'no_pets' | undefined>(
-    initialSeekerPets || undefined // ⭐ Mới
+    initialSeekerPets ?? undefined // ⭐ Mới - dùng ?? để xử lý null
   );
 
   useEffect(() => {
@@ -84,11 +84,15 @@ export default function FindRoommateForm({
     if (initialSeekerTraits) {
       setSeekerTraits(initialSeekerTraits);
     }
-    if (initialSeekerSmoking !== undefined) {
+    if (initialSeekerSmoking !== undefined && initialSeekerSmoking !== null) {
       setSeekerSmoking(initialSeekerSmoking);
+    } else {
+      setSeekerSmoking(undefined);
     }
-    if (initialSeekerPets !== undefined) {
+    if (initialSeekerPets !== undefined && initialSeekerPets !== null) {
       setSeekerPets(initialSeekerPets);
+    } else {
+      setSeekerPets(undefined);
     }
   }, [initialRequirements, initialSeekerTraits, initialSeekerSmoking, initialSeekerPets]);
 
