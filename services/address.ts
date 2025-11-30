@@ -61,22 +61,38 @@ class AddressService {
       }
       const data = await response.json();
       
-      // If no data returned, try alternative province codes for Hanoi
+      // If no data returned, try alternative province codes
       if (!data || data.length === 0) {
-        const alternativeCodes = ['01', '1', 'HN', 'Hanoi'];
-        for (const altCode of alternativeCodes) {
-          if (altCode !== provinceCode) {
-            try {
-              const altResponse = await fetch(`${this.baseURL}/wards?provinceCode=${altCode}`);
-              if (altResponse.ok) {
-                const altData = await altResponse.json();
-                if (altData && altData.length > 0) {
-                  data.push(...altData);
-                  break;
+        // Fallback cho Hà Nội
+        if (provinceCode === '01' || provinceCode === '1') {
+          const alternativeCodes = ['01', '1', 'HN', 'Hanoi'];
+          for (const altCode of alternativeCodes) {
+            if (altCode !== provinceCode) {
+              try {
+                const altResponse = await fetch(`${this.baseURL}/wards?provinceCode=${altCode}`);
+                if (altResponse.ok) {
+                  const altData = await altResponse.json();
+                  if (altData && altData.length > 0) {
+                    data.push(...altData);
+                    break;
+                  }
                 }
+              } catch (altError) {
               }
-            } catch (altError) {
             }
+          }
+        }
+        // Fallback cho Tp Hồ Chí Minh (nếu dùng 79 thì thử 29)
+        else if (provinceCode === '79') {
+          try {
+            const altResponse = await fetch(`${this.baseURL}/wards?provinceCode=29`);
+            if (altResponse.ok) {
+              const altData = await altResponse.json();
+              if (altData && altData.length > 0) {
+                data.push(...altData);
+              }
+            }
+          } catch (altError) {
           }
         }
       }

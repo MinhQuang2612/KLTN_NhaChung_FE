@@ -11,6 +11,7 @@ import { User } from "@/types/User";
 import { loginService } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { cityToProvinceCode } from "@/utils/geoMatch";
 
 function FieldBox({ label, children, className = "", required = false }: { label: string; children: ReactNode; className?: string; required?: boolean }) {
   return (
@@ -38,6 +39,15 @@ function FieldBox({ label, children, className = "", required = false }: { label
   );
 }
 
+// Helper để normalize ward name: loại bỏ prefix "Phường", "Xã", etc. và lowercase
+function normalizeWardName(ward: string): string {
+  if (!ward) return '';
+  return ward
+    .toLowerCase()
+    .replace(/^(phường|xã|quận|tp\.|thành phố|huyện|thị xã)\s*/i, '')
+    .trim();
+}
+
 export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   // Tất cả hooks phải được gọi ở top level, trước mọi early return
   const { showSuccess } = useToast();
@@ -49,6 +59,10 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
   const [currentAddress, setCurrentAddress] = useState<Address | null>(null);
   const [preferredWards, setPreferredWards] = useState<string[]>([]);
   const [wardOptions, setWardOptions] = useState<Ward[]>([]);
+  // Track provinceCode để đảm bảo useEffect chạy khi set từ profile
+  const [lastLoadedProvinceCode, setLastLoadedProvinceCode] = useState<string | null>(null);
+  // Lưu preferredCity ban đầu từ DB để so sánh khi save
+  const [originalPreferredCity, setOriginalPreferredCity] = useState<string | undefined>(undefined);
   const [provinceOptions, setProvinceOptions] = useState<{ code: string; name: string }[]>([]);
   // UX helpers for required hints
   const [focusedField, setFocusedField] = useState<string>("");
@@ -170,9 +184,21 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [data, preferredWards, currentAddress?.provinceCode]);
 
-  // useEffect để load profile data khi có user
+  // State để lưu preferredWards từ DB trước khi filter
+  const [preferredWardsFromDB, setPreferredWardsFromDB] = useState<string[]>([]);
+
+  // useEffect để load profile data khi có user (CHỈ khi KHÔNG phải registration flow)
   useEffect(() => {
     const fetch = async () => {
+      // Kiểm tra xem có phải registration flow không
+      if (typeof window !== "undefined") {
+        const isRegistrationFlow = localStorage.getItem("isRegistrationFlow") === "true";
+        if (isRegistrationFlow) {
+          // Đang trong registration flow -> không load profile cũ, để form trống
+          return;
+        }
+      }
+      
       // Sử dụng localUser nếu có, nếu không thì dùng user từ AuthContext
       const currentUser = localUser || user;
       
@@ -184,20 +210,54 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
         setLoading(true);
         const p = await getMyProfile();
         setData(p || {});
-        // Hydrate address: sử dụng preferredCity
+        // Lưu preferredCity ban đầu để so sánh khi save
+        setOriginalPreferredCity(p?.preferredCity);
+        // Hydrate address: sử dụng preferredCity và tìm provinceCode
         if (p?.preferredCity) {
-          setCurrentAddress({
-            street: "",
-            ward: "",
-            city: p.preferredCity,
-            provinceCode: "", 
-            provinceName: p.preferredCity,
-            wardCode: "", 
-            wardName: ""
-          } as Address);
+          // Tìm provinceCode từ preferredCity
+          let provinceCode = cityToProvinceCode(p.preferredCity) || "";
+          
+          // Nếu không tìm thấy provinceCode, thử normalize lại
+          if (!provinceCode) {
+            // Thử các cách viết khác của Tp Hồ Chí Minh
+            const cityLower = p.preferredCity.toLowerCase().trim();
+            if (cityLower.includes('hồ chí minh') || cityLower.includes('hcm') || cityLower.includes('tp hcm') || cityLower === 'tp hồ chí minh') {
+              provinceCode = "29"; // API dùng 29, không phải 79
+            } else if (cityLower.includes('hà nội') || cityLower.includes('hanoi') || cityLower.includes('hn')) {
+              provinceCode = "01";
+            }
+          }
+          
+          // Đảm bảo provinceCode được set trước khi set currentAddress
+          // Set currentAddress với provinceCode hợp lệ để trigger load wards
+          if (provinceCode) {
+            setCurrentAddress({
+              street: "",
+              ward: "",
+              city: p.preferredCity,
+              provinceCode: provinceCode, 
+              provinceName: p.preferredCity,
+              wardCode: "", 
+              wardName: ""
+            } as Address);
+          } else {
+            // Vẫn set currentAddress với city để hiển thị, nhưng không có provinceCode
+            setCurrentAddress({
+              street: "",
+              ward: "",
+              city: p.preferredCity,
+              provinceCode: "", 
+              provinceName: p.preferredCity,
+              wardCode: "", 
+              wardName: ""
+            } as Address);
+          }
         }
-        if (Array.isArray((p as any)?.preferredWards)) setPreferredWards((p as any).preferredWards as string[]);
-      } catch {
+        // Lưu preferredWards từ DB vào state riêng (sẽ được set sau khi load ward options)
+        if (Array.isArray((p as any)?.preferredWards) && (p as any).preferredWards.length > 0) {
+          setPreferredWardsFromDB((p as any).preferredWards as string[]);
+        }
+      } catch (error) {
         setData({});
       } finally {
         setLoading(false);
@@ -206,21 +266,97 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
     fetch();
   }, [user?.userId, localUser?.userId]); // Chỉ depend vào userId, không phải toàn bộ object
 
-  // Load ward options when city (provinceCode) changes, reset preferred wards if city changes
+  // Load ward options when city (provinceCode) changes
   useEffect(() => {
     const load = async () => {
-      if (!currentAddress?.provinceCode) { setWardOptions([]); setPreferredWards([]); return; }
+      // Chỉ load nếu có provinceCode hợp lệ (không phải empty string)
+      if (!currentAddress?.provinceCode || currentAddress.provinceCode === "") { 
+        // Chỉ reset wardOptions nếu không có provinceCode và không có city
+        // Nếu có city nhưng chưa có provinceCode thì đợi provinceCode được set
+        if (!currentAddress?.city) {
+          setWardOptions([]); 
+          setPreferredWards([]);
+          setPreferredWardsFromDB([]);
+        }
+        return; 
+      }
+      
+      // Tránh load lại nếu cùng provinceCode
+      if (lastLoadedProvinceCode === currentAddress.provinceCode) {
+        return;
+      }
+      
       try {
+        setLastLoadedProvinceCode(currentAddress.provinceCode);
         const wards = await addressService.getWardsByProvince(currentAddress.provinceCode);
         setWardOptions(wards);
-        // Filter preferredWards to still-valid ward names in this city
-        setPreferredWards(prev => prev.filter(w => wards.some(opt => opt.wardName === w)));
+        
+        // Nếu đã có preferredWards (user đã chọn), chỉ filter để giữ ward hợp lệ
+        // Sử dụng normalize để so sánh
+        setPreferredWards(prev => {
+          if (prev.length > 0) {
+            return prev.filter(selectedWard => {
+              const normalizedSelected = normalizeWardName(selectedWard);
+              return wards.some(opt => {
+                const normalizedOpt = normalizeWardName(opt.wardName);
+                return normalizedSelected === normalizedOpt || 
+                       normalizedSelected.includes(normalizedOpt) || 
+                       normalizedOpt.includes(normalizedSelected);
+              });
+            });
+          }
+          return prev;
+        });
       } catch {
         setWardOptions([]);
       }
     };
     load();
   }, [currentAddress?.provinceCode]);
+
+  // Set preferredWards từ DB sau khi wardOptions đã load
+  useEffect(() => {
+    // Chỉ chạy khi có preferredWards từ DB, wardOptions đã load, và chưa có preferredWards được set
+    if (preferredWardsFromDB.length > 0 && wardOptions.length > 0 && preferredWards.length === 0) {
+      // Filter preferredWards từ DB để chỉ giữ những ward hợp lệ
+      // Sử dụng normalize để so sánh vì DB có thể lưu "Phường An Khánh" còn API trả về "Xã An Khánh" hoặc ngược lại
+      const validWards = preferredWardsFromDB.filter(dbWard => {
+        const normalizedDbWard = normalizeWardName(dbWard);
+        return wardOptions.some(opt => {
+          const normalizedOptWard = normalizeWardName(opt.wardName);
+          // So sánh normalized chính xác
+          const exactMatch = normalizedDbWard === normalizedOptWard;
+          // Hoặc fuzzy match (một cái chứa cái kia)
+          const fuzzyMatch = normalizedDbWard.includes(normalizedOptWard) || 
+                 normalizedOptWard.includes(normalizedDbWard);
+          return exactMatch || fuzzyMatch;
+        });
+      });
+      
+      // Map lại để lấy tên ward từ API (để đảm bảo format đúng với wardOptions)
+      const mappedWards = validWards.map(dbWard => {
+        const normalizedDbWard = normalizeWardName(dbWard);
+        const matchedWard = wardOptions.find(opt => {
+          const normalizedOptWard = normalizeWardName(opt.wardName);
+          return normalizedDbWard === normalizedOptWard || 
+                 normalizedDbWard.includes(normalizedOptWard) || 
+                 normalizedOptWard.includes(normalizedDbWard);
+        });
+        // Nếu tìm thấy ward từ API, dùng tên từ API, nếu không thì giữ tên từ DB (cho trường hợp ward đã bị xóa/đổi tên)
+        return matchedWard?.wardName || dbWard;
+      });
+      
+      // Chỉ set nếu có ít nhất 1 ward hợp lệ, hoặc giữ nguyên tên từ DB nếu không match được (để user biết)
+      if (mappedWards.length > 0) {
+        setPreferredWards(mappedWards);
+      } else {
+        // Nếu không match được ward nào, vẫn set để user biết (nhưng sẽ không check được)
+        setPreferredWards(preferredWardsFromDB);
+      }
+      // Xóa preferredWardsFromDB sau khi đã set
+      setPreferredWardsFromDB([]);
+    }
+  }, [preferredWardsFromDB, wardOptions, preferredWards.length]);
 
   // Load provinces for address select
   useEffect(() => {
@@ -369,6 +505,9 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       // Gắn kèm tên Thành phố để phân biệt trùng tên phường ở tỉnh/thành khác nhau
       const preferredCity = currentAddress?.provinceName || currentAddress?.city || undefined;
 
+      // Kiểm tra xem preferredCity có thay đổi không
+      const cityChanged = preferredCity !== undefined && preferredCity !== originalPreferredCity;
+
       const payload: UserProfile = {
         userId: actualUser.userId || parsedRegistration?.userId,
         occupation: data.occupation,
@@ -388,13 +527,63 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         const hasAuthToken = !!token;
         
+        // Theo BE guide: Nếu preferredCity thay đổi, phải gửi 2 request riêng
+        if (cityChanged && hasAuthToken) {
+          // Request 1: Chỉ gửi preferredCity (Backend sẽ tự động clear preferredWards)
+          const cityPayload: Partial<UserProfile> = {
+            preferredCity: payload.preferredCity,
+            // KHÔNG gửi preferredWards trong request này
+          };
+          
+          try {
+            await updateMyProfile(cityPayload);
+            // Request 2: Gửi preferredWards sau khi city đã được update
+            const wardsPayload: Partial<UserProfile> = {
+              preferredWards: payload.preferredWards,
+              // KHÔNG gửi preferredCity trong request này
+            };
+            await updateMyProfile(wardsPayload);
+            
+            // Update các field khác (occupation, pets, roomType, contactMethod)
+            const otherFieldsPayload: Partial<UserProfile> = {
+              occupation: payload.occupation,
+              pets: payload.pets,
+              roomType: payload.roomType,
+              contactMethod: payload.contactMethod,
+            };
+            await updateMyProfile(otherFieldsPayload);
+            return;
+          } catch (updateError: any) {
+            if (updateError?.status !== 401) {
+              throw updateError;
+            }
+          }
+        }
+        
+        // Nếu city không thay đổi hoặc không có token, gửi bình thường
         if (hasAuthToken) {
           try {
             await createProfile(payload);
             return;
           } catch (createError: any) {
             if (createError?.status === 409) {
-              await updateMyProfile(payload);
+              // Nếu city không thay đổi, có thể gửi cả preferredWards cùng lúc
+              if (!cityChanged) {
+                await updateMyProfile(payload);
+              } else {
+                // Nếu city thay đổi nhưng không có token ở trên, vẫn phải gửi 2 request
+                const cityPayload: Partial<UserProfile> = { preferredCity: payload.preferredCity };
+                await updateMyProfile(cityPayload);
+                const wardsPayload: Partial<UserProfile> = { preferredWards: payload.preferredWards };
+                await updateMyProfile(wardsPayload);
+                const otherFieldsPayload: Partial<UserProfile> = {
+                  occupation: payload.occupation,
+                  pets: payload.pets,
+                  roomType: payload.roomType,
+                  contactMethod: payload.contactMethod,
+                };
+                await updateMyProfile(otherFieldsPayload);
+              }
               return;
             }
             if (createError?.status !== 401) {
@@ -419,6 +608,8 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
       
       try {
         await submitProfile();
+        // Cập nhật originalPreferredCity sau khi save thành công
+        setOriginalPreferredCity(preferredCity);
       } catch (error) {
         throw new Error("Không thể lưu profile. Vui lòng thử lại.");
       }
@@ -439,8 +630,8 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
           router.push("/login");
         }, 1500);
       } else {
-        // Nếu user đã đăng nhập và đang edit profile -> về trang chủ
-        router.push("/");
+        // Nếu user đã đăng nhập và đang edit profile -> hiển thị thông báo và ở lại trang
+        showSuccess('Lưu thành công', 'Hồ sơ khảo sát đã được cập nhật!');
       }
     } catch (e: any) {
       setError(e?.body?.message || e?.message || "Lưu khảo sát thất bại");
@@ -482,7 +673,18 @@ export default function ProfileSurvey({ role }: { role: "user" | "landlord" }) {
 
           {/* 3. preferredCity */}
           <FieldBox className="md:col-span-2" label="Thành phố ưu tiên" required>
-            <AddressSelector value={currentAddress} onChange={setCurrentAddress} fields={{ street: false, specificAddress: false, additionalInfo: false, preview: false, ward: false }} />
+            <AddressSelector 
+              value={currentAddress} 
+              onChange={(newAddr) => {
+                // Nếu thành phố thay đổi, clear preferredWards ngay lập tức
+                if (newAddr?.provinceCode && newAddr.provinceCode !== currentAddress?.provinceCode) {
+                  setPreferredWards([]);
+                  setPreferredWardsFromDB([]);
+                }
+                setCurrentAddress(newAddr);
+              }} 
+              fields={{ street: false, specificAddress: false, additionalInfo: false, preview: false, ward: false }} 
+            />
           </FieldBox>
 
           {/* 4. preferredWards */}

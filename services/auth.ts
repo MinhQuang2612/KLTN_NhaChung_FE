@@ -41,3 +41,15 @@ export async function verifyRegistration(email: string, otp: string) {
 export async function resendRegistrationOtp(email: string) {
   return apiPost<{ message: string; email: string; expiresIn: number }>("auth/resend-otp", { email });
 }
+
+/**
+ * Refresh registration token
+ * Lấy lại token nếu bị mất trong quá trình đăng ký (sau khi đã verify OTP)
+ */
+export async function refreshRegistrationToken(email: string): Promise<{
+  access_token: string;
+  expires_in: number;
+  user?: User;
+}> {
+  return apiPost("auth/refresh-registration-token", { email }, { skipAuth: true });
+}

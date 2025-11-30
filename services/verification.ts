@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/utils/api";
+import { apiGet, apiPost, apiPatch } from "@/utils/api";
 import { VerificationData, VerificationResponse, VerificationStatus } from "@/types/User";
 
 /**
@@ -26,4 +26,30 @@ export async function getMyVerificationStatus(): Promise<VerificationStatus> {
  */
 export async function getUserVerification(userId: string | number): Promise<any> {
   return apiGet(`users/${userId}/verification`);
+}
+
+/**
+ * Get current user's verification (full data)
+ * Trả về thông tin verification đầy đủ của user hiện tại
+ */
+export async function getMyVerification(): Promise<{ verification: any | null; message?: string }> {
+  return apiGet('verifications/me');
+}
+
+/**
+ * Update business license for current user's verification
+ * Cập nhật giấy phép kinh doanh cho verification đã tồn tại
+ */
+export async function updateBusinessLicense(businessLicense: string): Promise<{
+  success: boolean;
+  message: string;
+  verification: {
+    verificationId: number;
+    userId: number;
+    status: string;
+    businessLicense: string;
+    updatedAt: string;
+  };
+}> {
+  return apiPatch('verifications/me/business-license', { businessLicense });
 }

@@ -136,6 +136,9 @@ export default function RegisterFlow() {
           return;
         }
         
+        // 🔥 LƯU EMAIL để có thể refresh token sau này
+        localStorage.setItem("user_email", form.email);
+        
         // Lưu user nếu có
         if (verifyResult?.user) {
           localStorage.setItem("user", JSON.stringify(verifyResult.user));

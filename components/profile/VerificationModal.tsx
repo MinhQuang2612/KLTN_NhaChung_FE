@@ -15,11 +15,12 @@ interface VerificationModalProps {
   onClose: () => void;
   onVerify: (data: VerificationData) => void;
   skipAutoSubmit?: boolean; // Nếu true, chỉ gọi onVerify mà không submit thực sự
+  allowClose?: boolean; // Nếu false, không cho phép đóng modal (bắt buộc phải hoàn thành)
 }
 
 
 
-export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoSubmit = false }: VerificationModalProps) {
+export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoSubmit = false, allowClose = true }: VerificationModalProps) {
   const [step, setStep] = useState<'upload' | 'face' | 'review' | 'success'>('upload');
   const [formData, setFormData] = useState<Partial<VerificationData>>({});
   const [frontImage, setFrontImage] = useState<string>('');
@@ -305,21 +306,42 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        // Không cho phép đóng modal bằng cách click ra ngoài nếu bắt buộc
+        if (!allowClose && e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-900">Xác thực danh tính</h2>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose();
-            }}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <span className="text-lg">×</span>
-          </button>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-gray-900">Xác thực danh tính</h2>
+            {!allowClose && (
+              <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Bắt buộc phải hoàn thành
+              </p>
+            )}
+          </div>
+          {allowClose && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <span className="text-lg">×</span>
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -347,7 +369,7 @@ export default function VerificationModal({ isOpen, onClose, onVerify, skipAutoS
                   <div className="inline-flex items-center space-x-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
                     <FaCheckCircle className="text-green-600" />
                     <span className="text-sm text-green-700 font-medium">
-                      Đã tải đủ 2 mặt, đang xử lý...
+                      Đã tải đủ 2 mặt
                     </span>
                   </div>
                 )}

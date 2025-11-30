@@ -15,7 +15,8 @@ import {
   FaChartBar,
   FaTimes,
   FaChevronDown,
-  FaChevronRight
+  FaChevronRight,
+  FaUserEdit
 } from "react-icons/fa";
 
 interface MenuItem {
@@ -120,6 +121,11 @@ export default function DashboardSidebar({ isOpen: externalIsOpen, onClose }: Da
           href: "/my-rooms",
           icon: <FaDoorOpen />
         },
+        {
+          title: "Hồ sơ khảo sát",
+          href: "/profile/survey?role=user",
+          icon: <FaUserEdit />
+        },
       ];
     }
   };
@@ -146,23 +152,32 @@ export default function DashboardSidebar({ isOpen: externalIsOpen, onClose }: Da
   const isActive = (href: string, item?: MenuItem): boolean => {
     if (href === "#") return false;
     
+    // Remove query params from href for comparison
+    const hrefPath = href.split('?')[0];
+    const currentPath = pathname.split('?')[0];
+    
     // Special case for dashboard - exact match only
-    if (href === "/dashboard") {
-      return pathname === "/dashboard";
+    if (hrefPath === "/dashboard") {
+      return currentPath === "/dashboard";
     }
     
     // Special case for /landlord - exact match only (not /landlord/buildings, etc.)
-    if (href === "/landlord") {
-      return pathname === "/landlord" || pathname === "/landlord/";
+    if (hrefPath === "/landlord") {
+      return currentPath === "/landlord" || currentPath === "/landlord/";
+    }
+    
+    // Special case for profile/survey - match exact path regardless of query params
+    if (hrefPath === "/profile/survey") {
+      return currentPath === "/profile/survey";
     }
     
     // For other routes, check exact match or if it's a child path
-    if (pathname === href) {
+    if (currentPath === hrefPath) {
       return true;
     }
     
     // Check if pathname starts with href + "/" (to avoid matching parent routes)
-    if (pathname.startsWith(href + "/")) {
+    if (currentPath.startsWith(hrefPath + "/")) {
       return true;
     }
     

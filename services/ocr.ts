@@ -48,10 +48,15 @@ export async function processOCRWithFPT(
     const frontFormData = new FormData();
     frontFormData.append('image', await base64ToBlob(frontBase64), 'front.jpg');
     
+    const apiKey = process.env.NEXT_PUBLIC_FPT_AI_API_KEY;
+    if (!apiKey) {
+      throw new Error('FPT AI API key is not configured. Please set NEXT_PUBLIC_FPT_AI_API_KEY in environment variables.');
+    }
+
     const frontResponse = await fetch('https://api.fpt.ai/vision/idr/vnm', {
       method: 'POST',
       headers: {
-        'api_key': process.env.NEXT_PUBLIC_FPT_AI_API_KEY || 'FpwWCzDI8aMcEoLLAuZVeqwvLguAeNCB',
+        'api_key': apiKey,
       },
       body: frontFormData
     });
@@ -65,7 +70,7 @@ export async function processOCRWithFPT(
     const backResponse = await fetch('https://api.fpt.ai/vision/idr/vnm', {
       method: 'POST',
       headers: {
-        'api_key': process.env.NEXT_PUBLIC_FPT_AI_API_KEY || 'FpwWCzDI8aMcEoLLAuZVeqwvLguAeNCB',
+        'api_key': apiKey,
       },
       body: backFormData
     });

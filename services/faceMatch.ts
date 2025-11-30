@@ -40,10 +40,15 @@ export async function compareFaces(
     formData.append('file[]', faceBlob, 'face.jpg');
 
     // Call FPT.AI FaceMatch API
+    const apiKey = process.env.NEXT_PUBLIC_FPT_AI_API_KEY;
+    if (!apiKey) {
+      throw new Error('FPT AI API key is not configured. Please set NEXT_PUBLIC_FPT_AI_API_KEY in environment variables.');
+    }
+
     const response = await fetch('https://api.fpt.ai/dmp/checkface/v1', {
       method: 'POST',
       headers: {
-        'api_key': process.env.NEXT_PUBLIC_FPT_AI_API_KEY || 'FpwWCzDI8aMcEoLLAuZVeqwvLguAeNCB',
+        'api_key': apiKey,
       },
       body: formData
     });
