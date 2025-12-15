@@ -64,7 +64,8 @@ export interface TerminateContractResponse {
 // ==================== API FUNCTIONS ====================
 
 /**
- * Hủy hợp đồng
+ * @deprecated Sử dụng requestContractTermination từ rentalRequests.ts thay thế.
+ * Flow mới: Tenant gửi yêu cầu → Landlord duyệt/từ chối → Huỷ nếu được duyệt
  */
 export async function terminateContract(
   contractId: number,

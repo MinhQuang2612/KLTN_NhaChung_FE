@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getUserContract, downloadContractPDF, formatContractStatus, calculateContractDaysLeft } from "@/services/rentalRequests";
+import { getUserContract, downloadContractPDF, formatContractStatus, calculateContractDaysLeft, requestContractTermination, getTenantTerminationRequests, cancelTerminationRequest, TenantTerminationRequest, formatTerminationStatus } from "@/services/rentalRequests";
 import { formatCurrency, getContractPaymentStatus, RoomPaymentStatus } from "@/services/payments";
 import { useToast } from "@/contexts/ToastContext";
 import { ToastMessages } from "@/utils/toastMessages";
@@ -26,6 +26,17 @@ export default function ContractView({ contractId }: ContractViewProps) {
   const [contractPaymentStatus, setContractPaymentStatus] = useState<RoomPaymentStatus | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  
+  // Termination request states
+  const [showTerminationModal, setShowTerminationModal] = useState(false);
+  const [terminationReason, setTerminationReason] = useState("");
+  const [terminationDate, setTerminationDate] = useState("");
+  const [terminationLoading, setTerminationLoading] = useState(false);
+  const [terminationRequest, setTerminationRequest] = useState<TenantTerminationRequest | null>(null);
+  const [showTerminationWarning, setShowTerminationWarning] = useState(false);
+  const [terminationWarning, setTerminationWarning] = useState<any>(null);
+  const [cancellingRequest, setCancellingRequest] = useState(false);
+  
   const { showError, showSuccess } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +49,7 @@ export default function ContractView({ contractId }: ContractViewProps) {
     // Load contract payment status sau khi contract đã load xong
     if (contract) {
       loadContractPaymentStatus();
+      loadTerminationRequest();
     }
   }, [contract]);
 
@@ -119,6 +131,17 @@ export default function ContractView({ contractId }: ContractViewProps) {
         }
       };
 
+      const loadTerminationRequest = async () => {
+        try {
+          const requests = await getTenantTerminationRequests();
+          // Tìm yêu cầu huỷ cho hợp đồng hiện tại
+          const currentRequest = requests.find(r => r.contractId === contractId && r.status === 'pending');
+          setTerminationRequest(currentRequest || null);
+        } catch (error: any) {
+          // Không hiển thị lỗi
+        }
+      };
+
 
       const handlePayment = (invoice: any) => {
         setSelectedInvoice(invoice);
@@ -155,6 +178,50 @@ export default function ContractView({ contractId }: ContractViewProps) {
           showError(message.title, error.message || message.message);
         } finally {
           setDownloading(false);
+        }
+      };
+
+      const handleRequestTermination = async () => {
+        try {
+          setTerminationLoading(true);
+          const payload: { reason?: string; terminationDate?: string } = {};
+          if (terminationReason.trim()) payload.reason = terminationReason.trim();
+          if (terminationDate) payload.terminationDate = new Date(terminationDate).toISOString();
+          
+          const response = await requestContractTermination(contractId, payload);
+          
+          // Nếu có warning, hiển thị modal cảnh báo
+          if (response.warning) {
+            setTerminationWarning(response.warning);
+            setShowTerminationWarning(true);
+          }
+          
+          showSuccess("Thành công", response.message);
+          setShowTerminationModal(false);
+          setTerminationReason("");
+          setTerminationDate("");
+          
+          // Reload termination request
+          loadTerminationRequest();
+        } catch (error: any) {
+          showError("Không thể gửi yêu cầu", error.message || "Đã xảy ra lỗi");
+        } finally {
+          setTerminationLoading(false);
+        }
+      };
+
+      const handleCancelTerminationRequest = async () => {
+        if (!terminationRequest) return;
+        
+        try {
+          setCancellingRequest(true);
+          await cancelTerminationRequest(terminationRequest.requestId);
+          showSuccess("Thành công", "Đã huỷ yêu cầu huỷ hợp đồng");
+          setTerminationRequest(null);
+        } catch (error: any) {
+          showError("Không thể huỷ yêu cầu", error.message || "Đã xảy ra lỗi");
+        } finally {
+          setCancellingRequest(false);
         }
       };
 
@@ -575,28 +642,77 @@ export default function ContractView({ contractId }: ContractViewProps) {
           )}
 
 
-          {/* Actions */}
-          <div className="flex gap-4 pt-6 border-t border-gray-200">
-            {contract.status === 'active' && (
-              <button
-                onClick={handleDownloadContract}
-                disabled={downloading}
-                className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {downloading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Đang tải...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          {/* Yêu cầu huỷ hợp đồng đang chờ duyệt */}
+          {terminationRequest && (
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Tải hợp đồng PDF
-                  </>
+                    Yêu cầu huỷ hợp đồng đang chờ duyệt
+                  </h3>
+                  <div className="text-sm text-orange-700 space-y-1">
+                    {terminationRequest.reason && (
+                      <p><strong>Lý do:</strong> {terminationRequest.reason}</p>
+                    )}
+                    <p><strong>Ngày yêu cầu kết thúc:</strong> {formatDate(terminationRequest.requestedTerminationDate)}</p>
+                    <p><strong>Ngày gửi:</strong> {formatDateTime(terminationRequest.createdAt)}</p>
+                    {terminationRequest.willLoseDeposit && (
+                      <p className="text-red-600 font-medium">
+                        ⚠️ Sẽ không được hoàn lại tiền cọc {formatCurrency(terminationRequest.depositAmount)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleCancelTerminationRequest}
+                  disabled={cancellingRequest}
+                  className="px-3 py-1.5 text-sm bg-white border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 disabled:opacity-50 transition-colors"
+                >
+                  {cancellingRequest ? "Đang huỷ..." : "Huỷ yêu cầu"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-4 pt-6 border-t border-gray-200">
+            {contract.status === 'active' && (
+              <>
+                <button
+                  onClick={handleDownloadContract}
+                  disabled={downloading}
+                  className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {downloading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Đang tải...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Tải hợp đồng PDF
+                    </>
+                  )}
+                </button>
+                
+                {!terminationRequest && (
+                  <button
+                    onClick={() => setShowTerminationModal(true)}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Yêu cầu huỷ hợp đồng
+                  </button>
                 )}
-              </button>
+              </>
             )}
           </div>
         </div>
@@ -613,6 +729,128 @@ export default function ContractView({ contractId }: ContractViewProps) {
             setSelectedInvoice(null);
           }}
         />
+      )}
+
+      {/* Modal yêu cầu huỷ hợp đồng */}
+      {showTerminationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Yêu cầu huỷ hợp đồng</h2>
+                <button
+                  onClick={() => {
+                    setShowTerminationModal(false);
+                    setTerminationReason("");
+                    setTerminationDate("");
+                  }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                >
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Cảnh báo */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  <strong>⚠️ Lưu ý:</strong> Nếu bạn huỷ hợp đồng trước thời hạn, bạn có thể sẽ <strong>không được hoàn lại tiền cọc</strong>.
+                </p>
+              </div>
+
+              {/* Ngày kết thúc mong muốn */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ngày muốn kết thúc (tuỳ chọn)
+                </label>
+                <input
+                  type="date"
+                  value={terminationDate}
+                  onChange={(e) => setTerminationDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">Để trống sẽ lấy ngày hiện tại</p>
+              </div>
+
+              {/* Lý do */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lý do huỷ (tuỳ chọn)
+                </label>
+                <textarea
+                  value={terminationReason}
+                  onChange={(e) => setTerminationReason(e.target.value)}
+                  rows={3}
+                  placeholder="Nhập lý do bạn muốn huỷ hợp đồng..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowTerminationModal(false);
+                  setTerminationReason("");
+                  setTerminationDate("");
+                }}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Huỷ bỏ
+              </button>
+              <button
+                onClick={handleRequestTermination}
+                disabled={terminationLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                {terminationLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Đang gửi...
+                  </>
+                ) : (
+                  "Gửi yêu cầu"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal cảnh báo mất tiền cọc */}
+      {showTerminationWarning && terminationWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Cảnh báo mất tiền cọc</h3>
+                <p className="text-gray-600 mb-4">{terminationWarning.message}</p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left text-sm text-red-800">
+                  <p><strong>Thời gian còn lại:</strong> {terminationWarning.daysBeforeEnd} ngày</p>
+                  <p><strong>Tiền cọc sẽ mất:</strong> {formatCurrency(terminationWarning.depositAmount)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowTerminationWarning(false)}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

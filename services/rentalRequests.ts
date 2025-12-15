@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from "@/utils/api";
+import { apiGet, apiPost, apiPut, apiDel } from "@/utils/api";
 
 // Types cho Rental Requests
 export interface RentalRequest {
@@ -93,6 +93,55 @@ export async function getLandlordContractById(id: number): Promise<LandlordContr
   return apiGet(`landlord/contracts/${id}`);
 }
 
+// Detail cho landlord contract (tham chiếu spec FE-landlord-contract-detail.md)
+export interface LandlordContractDetail {
+  contractId: number;
+  landlordId: number;
+  roomId: number;
+  status: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  deposit: number;
+  totalMonths?: number;
+  tenantDetails: Array<{
+    tenantId: number;
+    fullName: string;
+    phone: string;
+    email: string;
+    cccd?: string;
+    moveInDate: string;
+    status: string;
+  }>;
+  room?: {
+    roomId: number;
+    roomNumber?: string;
+    area?: number;
+    category?: string;
+    chungCuInfo?: any;
+    nhaNguyenCanInfo?: any;
+    floor?: number;
+    furniture?: string[];
+    utilities?: string[];
+    images?: string[];
+    status?: string;
+    building?: {
+      buildingId: number;
+      name?: string;
+      buildingType?: string;
+      address?: {
+        street?: string;
+        wardName?: string;
+        provinceName?: string;
+      };
+    };
+  };
+}
+
+export async function getLandlordContractDetail(id: number): Promise<LandlordContractDetail> {
+  return apiGet(`landlord/contracts/${id}`);
+}
+
 /**
  * Lấy chi tiết hợp đồng
  */
@@ -126,7 +175,7 @@ export async function getUserContract(contractId: number): Promise<{
 }
 
 /**
- * Tải hợp đồng PDF
+ * Tải hợp đồng PDF (tenant)
  */
 export async function downloadContractPDF(contractId: number): Promise<Blob> {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/contracts/${contractId}/download-pdf`, {
@@ -137,6 +186,24 @@ export async function downloadContractPDF(contractId: number): Promise<Blob> {
   
   if (!response.ok) {
     const errorText = await response.text();
+    throw new Error(`Không thể tải hợp đồng: ${response.status} ${response.statusText}`);
+  }
+  
+  const blob = await response.blob();
+  return blob;
+}
+
+/**
+ * Tải hợp đồng PDF (landlord)
+ */
+export async function downloadLandlordContractPDF(contractId: number): Promise<Blob> {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/landlord/contracts/${contractId}/download-pdf`, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    }
+  });
+  
+  if (!response.ok) {
     throw new Error(`Không thể tải hợp đồng: ${response.status} ${response.statusText}`);
   }
   
@@ -183,4 +250,154 @@ export function calculateContractDaysLeft(endDate: string): number {
   const diffTime = end.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
+}
+
+// ==================== TERMINATION REQUESTS ====================
+
+// Termination request types
+export interface TerminationRequestWarning {
+  isEarlyTermination: boolean;
+  willLoseDeposit: boolean;
+  depositAmount: number;
+  daysBeforeEnd: number;
+  message: string;
+}
+
+export interface TenantTerminationRequest {
+  requestId: number;
+  contractId: number;
+  status: 'pending' | 'approved' | 'rejected';
+  reason?: string;
+  requestedTerminationDate: string;
+  isEarlyTermination: boolean;
+  willLoseDeposit: boolean;
+  depositAmount: number;
+  landlordResponse?: string;
+  respondedAt?: string;
+  createdAt: string;
+}
+
+export interface LandlordTerminationRequest {
+  requestId: number;
+  contractId: number;
+  tenantId: number;
+  status: 'pending' | 'approved' | 'rejected';
+  reason?: string;
+  requestedTerminationDate: string;
+  isEarlyTermination: boolean;
+  willLoseDeposit: boolean;
+  depositAmount: number;
+  daysBeforeEnd: number;
+  createdAt: string;
+  contract: {
+    contractId: number;
+    startDate: string;
+    endDate: string;
+    monthlyRent: number;
+    deposit: number;
+  };
+  tenant: {
+    tenantId: number;
+    name: string;
+    phone: string;
+    email: string;
+  };
+  room: {
+    roomId: number;
+    roomNumber: string;
+  };
+}
+
+export interface RequestTerminationPayload {
+  reason?: string;
+  terminationDate?: string;
+}
+
+export interface RequestTerminationResponse {
+  message: string;
+  request: {
+    requestId: number;
+    contractId: number;
+    status: string;
+    requestedTerminationDate: string;
+    isEarlyTermination: boolean;
+    willLoseDeposit: boolean;
+    depositAmount: number;
+  };
+  warning?: TerminationRequestWarning;
+}
+
+// ==================== TENANT TERMINATION REQUESTS API ====================
+
+/**
+ * Yêu cầu huỷ hợp đồng (Tenant)
+ */
+export async function requestContractTermination(
+  contractId: number,
+  payload: RequestTerminationPayload
+): Promise<RequestTerminationResponse> {
+  return apiPut(`users/me/contracts/${contractId}/request-termination`, payload);
+}
+
+/**
+ * Lấy danh sách yêu cầu huỷ của tenant
+ */
+export async function getTenantTerminationRequests(): Promise<TenantTerminationRequest[]> {
+  return apiGet("users/me/termination-requests");
+}
+
+/**
+ * Huỷ yêu cầu huỷ hợp đồng (trước khi chủ duyệt)
+ */
+export async function cancelTerminationRequest(requestId: number): Promise<{ message: string }> {
+  return apiDel(`users/me/termination-requests/${requestId}`);
+}
+
+// ==================== LANDLORD TERMINATION REQUESTS API ====================
+
+/**
+ * Lấy danh sách yêu cầu huỷ cho landlord
+ */
+export async function getLandlordTerminationRequests(): Promise<LandlordTerminationRequest[]> {
+  return apiGet("landlord/termination-requests");
+}
+
+/**
+ * Duyệt yêu cầu huỷ hợp đồng (Landlord)
+ */
+export async function approveTerminationRequest(
+  requestId: number,
+  response?: string
+): Promise<{
+  message: string;
+  request: { requestId: number; status: string; respondedAt: string };
+  contract: { contractId: number; status: string; terminatedAt: string };
+  affectedPosts?: { count: number; message: string };
+}> {
+  return apiPut(`landlord/termination-requests/${requestId}/approve`, { response });
+}
+
+/**
+ * Từ chối yêu cầu huỷ hợp đồng (Landlord)
+ */
+export async function rejectTerminationRequest(
+  requestId: number,
+  response?: string
+): Promise<{
+  message: string;
+  request: { requestId: number; status: string; landlordResponse?: string; respondedAt: string };
+}> {
+  return apiPut(`landlord/termination-requests/${requestId}/reject`, { response });
+}
+
+/**
+ * Format trạng thái yêu cầu huỷ
+ */
+export function formatTerminationStatus(status: string): string {
+  const statusMap = {
+    'pending': 'Đang chờ duyệt',
+    'approved': 'Đã duyệt',
+    'rejected': 'Đã từ chối'
+  };
+  return statusMap[status as keyof typeof statusMap] || status;
 }

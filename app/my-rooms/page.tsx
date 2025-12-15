@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserRooms, UserRoom } from '@/services/rooms';
 import { getUserRentalRequests } from '@/services/rentalRequests';
-import { terminateContract, getRentalHistory } from '@/services/rentalHistory';
+import { getRentalHistory } from '@/services/rentalHistory';
+import { requestContractTermination, getTenantTerminationRequests, cancelTerminationRequest, TenantTerminationRequest, formatTerminationStatus } from '@/services/rentalRequests';
 import Link from 'next/link';
 import { createReview } from '@/services/reviews';
 import { useToast } from '@/contexts/ToastContext';
@@ -25,12 +26,17 @@ import { getMyProfile } from '@/services/userProfiles';
 
 const MyRoomsPage = () => {
   const { user, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+  const [activeTab, setActiveTab] = useState<'current' | 'history' | 'terminations'>('current');
   const [rooms, setRooms] = useState<UserRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [terminatingContract, setTerminatingContract] = useState<number | null>(null);
   const [historyCount, setHistoryCount] = useState<number>(0);
+  
+  // Termination requests state
+  const [terminationRequests, setTerminationRequests] = useState<TenantTerminationRequest[]>([]);
+  const [terminationsLoading, setTerminationsLoading] = useState(false);
+  const [cancellingRequest, setCancellingRequest] = useState<number | null>(null);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState<{ id: number; roomNumber: string } | null>(null);
   const [ratings, setRatings] = useState<Record<number, number>>({});
@@ -58,6 +64,7 @@ const MyRoomsPage = () => {
     if (!isLoading && user) {
       loadMyRooms();
       loadHistoryCount();
+      loadTerminationRequests();
       loadProfile(); // ⭐ Load profile để lấy posterTraits
     }
   }, [user, isLoading]);
@@ -91,6 +98,34 @@ const MyRoomsPage = () => {
     } catch (error) {
       // Nếu lỗi thì set 0, không show error
       setHistoryCount(0);
+    }
+  };
+
+  const loadTerminationRequests = async () => {
+    try {
+      setTerminationsLoading(true);
+      const data = await getTenantTerminationRequests();
+      setTerminationRequests(Array.isArray(data) ? data : []);
+    } catch (error) {
+      // Nếu lỗi thì set [], không show error
+      setTerminationRequests([]);
+    } finally {
+      setTerminationsLoading(false);
+    }
+  };
+
+  const handleCancelTerminationRequest = async (requestId: number) => {
+    try {
+      setCancellingRequest(requestId);
+      await cancelTerminationRequest(requestId);
+      showSuccess('Thành công', 'Đã huỷ yêu cầu huỷ hợp đồng');
+      // Reload danh sách
+      loadTerminationRequests();
+    } catch (error: any) {
+      const message = extractApiErrorMessage(error);
+      showError('Không thể huỷ yêu cầu', message);
+    } finally {
+      setCancellingRequest(null);
     }
   };
 
@@ -206,37 +241,38 @@ const MyRoomsPage = () => {
     setShowTerminateModal(true);
   };
 
-  const handleConfirmTerminate = async (reason: string) => {
+  const handleConfirmTerminate = async (reason: string, terminationDate?: string) => {
     if (!selectedContract) return;
 
     try {
       setTerminatingContract(selectedContract.id);
-      const response = await terminateContract(
-        selectedContract.id, 
-        reason.trim() ? { reason: reason.trim() } : undefined
-      );
       
-      // Message với số lượng posts được active
-      const postsMsg = response.affectedPosts?.count 
-        ? ` Đã active lại ${response.affectedPosts.count} bài đăng.`
-        : '';
-      showSuccess('Đã hủy hợp đồng', `Hợp đồng đã được hủy và phòng đã được giải phóng.${postsMsg}`);
+      const payload: { reason?: string; terminationDate?: string } = {};
+      if (reason.trim()) payload.reason = reason.trim();
+      if (terminationDate) payload.terminationDate = new Date(terminationDate).toISOString();
+      
+      const response = await requestContractTermination(selectedContract.id, payload);
+      
+      // Hiển thị cảnh báo nếu có
+      if (response.warning) {
+        showSuccess(
+          'Đã gửi yêu cầu huỷ hợp đồng',
+          `${response.message}. Lưu ý: ${response.warning.message}`
+        );
+      } else {
+        showSuccess('Đã gửi yêu cầu', response.message);
+      }
       
       // Close modal
       setShowTerminateModal(false);
       setSelectedContract(null);
       
-      // Reload rooms
+      // Reload rooms và termination requests
       await loadMyRooms();
-      
-      // Reload history count
-      await loadHistoryCount();
-      
-      // Chuyển sang tab lịch sử
-      setActiveTab('history');
+      await loadTerminationRequests();
     } catch (error: any) {
       const message = extractApiErrorMessage(error);
-      showError('Không thể hủy hợp đồng', message);
+      showError('Không thể gửi yêu cầu', message);
     } finally {
       setTerminatingContract(null);
     }
@@ -312,12 +348,135 @@ const MyRoomsPage = () => {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('terminations')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors relative ${
+                activeTab === 'terminations'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Yêu cầu huỷ HĐ
+              {terminationRequests.filter(r => r.status === 'pending').length > 0 && (
+                <span className="ml-2 py-0.5 px-2 rounded-full bg-orange-100 text-orange-600 text-xs font-semibold">
+                  {terminationRequests.filter(r => r.status === 'pending').length}
+                </span>
+              )}
+            </button>
           </nav>
         </div>
 
         {/* Content */}
         {activeTab === 'history' ? (
           <RentalHistory onCountChange={setHistoryCount} />
+        ) : activeTab === 'terminations' ? (
+          <div className="space-y-4">
+            {terminationsLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Đang tải yêu cầu huỷ hợp đồng...</p>
+              </div>
+            ) : terminationRequests.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Không có yêu cầu huỷ nào</h3>
+                <p className="text-gray-500">Bạn chưa gửi yêu cầu huỷ hợp đồng nào.</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                {terminationRequests.map((request, index) => {
+                  const isLast = index === terminationRequests.length - 1;
+                  const isPending = request.status === 'pending';
+                  
+                  return (
+                    <div
+                      key={request.requestId}
+                      className={`p-6 ${!isLast ? 'border-b border-gray-200' : ''}`}
+                    >
+                      {/* Header */}
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              Yêu cầu huỷ hợp đồng #{request.contractId}
+                            </h3>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              request.status === 'approved' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {formatTerminationStatus(request.status)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            Gửi lúc: {new Date(request.createdAt).toLocaleString('vi-VN')}
+                          </p>
+                        </div>
+                        
+                        {isPending && (
+                          <button
+                            onClick={() => handleCancelTerminationRequest(request.requestId)}
+                            disabled={cancellingRequest === request.requestId}
+                            className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                          >
+                            {cancellingRequest === request.requestId ? 'Đang huỷ...' : 'Huỷ yêu cầu'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Details */}
+                      <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-2">
+                          <p>
+                            <span className="text-gray-500">Ngày muốn kết thúc:</span>{' '}
+                            <span className="font-medium text-gray-900">
+                              {new Date(request.requestedTerminationDate).toLocaleDateString('vi-VN')}
+                            </span>
+                          </p>
+                          {request.reason && (
+                            <p>
+                              <span className="text-gray-500">Lý do:</span>{' '}
+                              <span className="text-gray-900">{request.reason}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {request.isEarlyTermination && (
+                            <p className="text-orange-600 font-medium">
+                              Huỷ trước hạn hợp đồng
+                            </p>
+                          )}
+                          {request.willLoseDeposit && (
+                            <p className="text-red-600 font-medium">
+                              Sẽ mất tiền cọc: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(request.depositAmount)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Landlord response */}
+                      {request.landlordResponse && (
+                        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-sm text-blue-800">
+                            <strong>Phản hồi từ chủ nhà:</strong> {request.landlordResponse}
+                          </p>
+                          {request.respondedAt && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Phản hồi lúc: {new Date(request.respondedAt).toLocaleString('vi-VN')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {loading ? (
@@ -479,25 +638,33 @@ const MyRoomsPage = () => {
                       Xem hợp đồng
                     </Link>
                     
-                    {room.contractStatus === 'active' && (
-                      <button
-                        onClick={() => handleTerminateContract(room.contractId, room.roomNumber)}
-                        disabled={terminatingContract === room.contractId}
-                        className="w-full bg-red-600 text-white text-center py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {terminatingContract === room.contractId ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                            </svg>
-                            Đang xử lý...
-                          </span>
-                        ) : (
-                          'Hủy hợp đồng'
-                        )}
-                      </button>
-                    )}
+                    {room.contractStatus === 'active' && (() => {
+                      const hasPendingTermination = terminationRequests.some(
+                        req => req.contractId === room.contractId && req.status === 'pending'
+                      );
+                      
+                      return (
+                        <button
+                          onClick={() => handleTerminateContract(room.contractId, room.roomNumber)}
+                          disabled={terminatingContract === room.contractId || hasPendingTermination}
+                          className="w-full bg-red-600 text-white text-center py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {terminatingContract === room.contractId ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                              </svg>
+                              Đang xử lý...
+                            </span>
+                          ) : hasPendingTermination ? (
+                            'Đang chờ duyệt huỷ'
+                          ) : (
+                            'Hủy hợp đồng'
+                          )}
+                        </button>
+                      );
+                    })()}
                   </div>
 
                   {/* Đánh giá (gộp) */}

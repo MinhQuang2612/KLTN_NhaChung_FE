@@ -7,7 +7,7 @@ interface TerminateContractModalProps {
   isOpen: boolean;
   roomNumber: string;
   onClose: () => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string, terminationDate?: string) => void;
   isLoading?: boolean;
 }
 
@@ -19,11 +19,18 @@ export default function TerminateContractModal({
   isLoading = false
 }: TerminateContractModalProps) {
   const [reason, setReason] = useState("");
+  const [terminationDate, setTerminationDate] = useState("");
 
   if (!isOpen) return null;
 
   const handleConfirm = () => {
-    onConfirm(reason);
+    onConfirm(reason, terminationDate || undefined);
+  };
+
+  const handleClose = () => {
+    setReason("");
+    setTerminationDate("");
+    onClose();
   };
 
   return (
@@ -32,13 +39,13 @@ export default function TerminateContractModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-              <FaExclamationTriangle className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+              <FaExclamationTriangle className="w-5 h-5 text-orange-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Xác nhận hủy hợp đồng</h2>
+            <h2 className="text-xl font-bold text-gray-900">Yêu cầu huỷ hợp đồng</h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <FaTimes className="w-5 h-5 text-gray-500" />
@@ -49,7 +56,7 @@ export default function TerminateContractModal({
         <div className="p-6 space-y-4">
           {/* Message */}
           <p className="text-gray-700">
-            Bạn có chắc chắn muốn hủy hợp đồng thuê <span className="font-semibold text-gray-900">Phòng {roomNumber}</span>?
+            Bạn muốn gửi yêu cầu huỷ hợp đồng thuê <span className="font-semibold text-gray-900">Phòng {roomNumber}</span>?
           </p>
 
           {/* Warning */}
@@ -57,16 +64,37 @@ export default function TerminateContractModal({
             <p className="text-sm text-yellow-800">
               <span className="inline-flex items-center gap-2 font-semibold text-yellow-900">
                 <FaExclamationTriangle className="h-4 w-4" />
-                Lưu ý:
-              </span>{" "}
-              Hành động này không thể hoàn tác. Phòng sẽ được giải phóng và bài đăng sẽ được kích hoạt lại.
+                Lưu ý quan trọng:
+              </span>
             </p>
+            <ul className="text-sm text-yellow-800 mt-2 space-y-1 list-disc list-inside">
+              <li>Yêu cầu sẽ được gửi đến chủ nhà để xem xét</li>
+              <li>Nếu huỷ <strong>trước hạn hợp đồng</strong>, bạn có thể <strong>không được hoàn lại tiền cọc</strong></li>
+              <li>Bạn có thể huỷ yêu cầu trước khi chủ nhà phản hồi</li>
+            </ul>
+          </div>
+
+          {/* Termination date input */}
+          <div>
+            <label htmlFor="terminationDate" className="block text-sm font-medium text-gray-700 mb-2">
+              Ngày muốn kết thúc (tuỳ chọn)
+            </label>
+            <input
+              type="date"
+              id="terminationDate"
+              value={terminationDate}
+              onChange={(e) => setTerminationDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-1">Để trống sẽ lấy ngày hiện tại</p>
           </div>
 
           {/* Reason input */}
           <div>
             <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
-              Lý do hủy hợp đồng (tùy chọn)
+              Lý do huỷ hợp đồng (tuỳ chọn)
             </label>
             <textarea
               id="reason"
@@ -86,18 +114,18 @@ export default function TerminateContractModal({
           {/* Actions */}
           <div className="flex space-x-3 pt-2">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isLoading}
               className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Hủy
+              Huỷ bỏ
             </button>
             <button
               onClick={handleConfirm}
               disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Đang xử lý...' : 'Xác nhận hủy'}
+              {isLoading ? 'Đang gửi...' : 'Gửi yêu cầu'}
             </button>
           </div>
         </div>
